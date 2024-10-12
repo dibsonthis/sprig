@@ -1,5 +1,5 @@
 const globals = {
-    MODULES_PATH: "/Users/adib/Dev/Personal/Languages/newlang/modules",
+    APP_ID: "A0001",
 }
 
 const operators = {

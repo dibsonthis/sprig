@@ -44,8 +44,8 @@ print(greet("buddy")) // Hey buddy, welcome to Sprig 🌿
 ### Leveraging NodeJS on the fly
 
 ```python
-const nativeAdd = jsEval(`(a, b) => a + b`)
-nativeAdd(20, 30)->print // 50
+const nativeAdd = jsEval(`(a, b) => a + b`);
+(100 + nativeAdd(20, 30))->print // 150
 
 const rawBuffer = jsEval(`(size) => Buffer.alloc(size)`)
 const buffer = rawBuffer(10)

@@ -615,7 +615,5 @@
 
 // Test.run(...tests)
 
-const commonKeys = __common
-    ->keys
-    ->filter((k) => k[0] != "_")
-    ->print
+const nativeAdd = jsEval(`(a, b) => a + b`);
+(100 + nativeAdd(20, 30))->print // 150

@@ -615,5 +615,7 @@
 
 // Test.run(...tests)
 
-const nativeAdd = jsEval(`(a, b) => a + b`);
-(100 + nativeAdd(20, 30))->print // 150
+const rawBuffer = jsEval(`(size) => Buffer.alloc(size)`)
+const buffer = rawBuffer(10)
+print(buffer) // Buffer* Raw<object>
+print(buffer->value)

@@ -1,12 +1,12 @@
 # Sprig - A Language Sprouting From NodeJS
 
-Sprig is a dynamic programming language built on NodeJS that allows developers to write efficient and powerful code. It leverages the capabilities of NodeJS while providing its own syntax and structure.
+Sprig is a dynamic programming language built on NodeJS that allows developers to write efficient and powerful code. It leverages the capabilities of NodeJS while providing its own syntax and useful extensions.
 
 ## Key Features
 
 - **Bi-Directional Data Flow**: Sprig enables seamless data exchange between NodeJS and the Sprig environment, making it easy to utilize existing NodeJS libraries and functions within your Sprig code.
 
-- **Extensibility**: The language is designed for easy extension, allowing developers to create custom modules and functions tailored to their specific needs.
+- **Extensibility**: Sprig is designed for easy extension, allowing developers to create native JS functionality on the fly to extend the language.
 
 - **Integration with NodeJS**: Sprig takes advantage of NodeJS’s non-blocking I/O and asynchronous programming model, providing a robust framework for building scalable applications.
 
@@ -34,6 +34,141 @@ Sprig is a dynamic programming language built on NodeJS that allows developers t
 ### Your first Sprig program
 
 ```python
-const sayHi = () => print("Hello from Sprig 🌿")
-sayHi()
+const greet = (name) => `Hey {{name}}, welcome to Sprig 🌿`
+
+"friend"->greet->print // Hey friend, welcome to Sprig 🌿
+greet("pal")->print() // Hey pal, welcome to Sprig 🌿
+print(greet("buddy")) // Hey buddy, welcome to Sprig 🌿
+```
+
+### Leveraging NodeJS on the fly
+
+```python
+const nativeAdd = jsEval(`(a, b) => a + b`)
+nativeAdd(20, 30)->print // 50
+
+const rawBuffer = jsEval(`(size) => Buffer.alloc(size)`)
+const buffer = rawBuffer(10)
+print(buffer) // Buffer* Raw<object>
+```
+
+## Further Examples
+
+### Proxy
+
+Much like JS, we can create object proxies that whose native functionality can be intercepted via a handler object. Note that '\_' means the intercept applies to all the properties. Property keys can also be provided here for specificity.
+
+```python
+const person = {
+        name: "Jack",
+        id: 43,
+        address: {
+            name: "123 Fake st."
+        }
+    }
+
+    const handler = {
+        repr: {
+            _: (v) => "***"
+        },
+        get: {
+            _: (v) => (v ? [v] : undefined)
+        },
+        set: {
+            _: (o, k, v, c) => {
+                if (o[k]) {
+                    return v
+                }
+                return undefined
+            }
+        },
+    }
+
+    const personProxy = person->proxy(handler)
+    personProxy.age = 45
+    personProxy.id = 1001
+
+    print(personProxy.name[0]) // "Jack"
+    print(personProxy.id[0]) // 1001
+    print(personProxy.age) // undefined
+```
+
+## Classes
+
+Classes are simply constructor functions in Sprig. The difference between a normal function and a constructor is the parentheses in the function name. Anything returned from a constructor will have its type be that constructor function.
+
+```python
+const (Color) = (r = 0, g = 0, b = 0) => {
+        const color = {r: 0, g: 0, b: 0}->proxy({
+            repr: {
+                r: (v) => `\e[31m{{v}}\e[0m`,
+                g: (v) => `\e[32m{{v}}\e[0m`,
+                b: (v) => `\e[34m{{v}}\e[0m`,
+            },
+            set: {
+                _: (o, k, v, c) => {
+                    if (v < 0) {
+                        return 0
+                    }
+                    if (v > 255) {
+                        return 255
+                    }
+                    return v
+                }
+            }
+        })
+
+        color.r = r
+        color.g = g
+        color.b = b
+
+        return color
+    }
+
+    const c = Color()
+
+    c.r = 20
+    c.g = 400
+    c.b = -34
+
+    const constructor = c->class
+
+    print(c.r) // 20
+    print(c.g) // 255
+    print(c.b) // 0
+```
+
+## Common
+
+Common built-ins can be accessed globally or through the \_\_common object.
+
+```python
+const commonKeys = __common
+    ->keys
+    ->filter((k) => k[0] != "_")
+    ->print
+
+// [instanceOf, includes, reduce, slice, timeout, interval, fetch, then, catch, delay, promise, toNumber, toString, truncate, Io, Json, Server, Str, Testing, Websocket]
+```
+
+## Config overrides
+
+Adding a `config.sp` file at the top level can set global variables and create custom operators. Anything in the `globals` object will be injected into the global scope. Operators defined in `operators` can be either unary or binary based on the number of parameters provided.
+
+```python
+
+// config.sp
+
+const globals = {
+    MODULES_PATH: "/Users/adib/Dev/Personal/Languages/newlang/modules",
+}
+
+const operators = {
+    "$$": (a, b) => {
+        return (a * b) / 3
+    },
+    "#": (v) => {
+        return [v]
+    },
+}
 ```

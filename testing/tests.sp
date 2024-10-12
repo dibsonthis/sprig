@@ -615,5 +615,7 @@
 
 // Test.run(...tests)
 
-const sayHi = () => print("Hello from Sprig 🌿")
-sayHi()
+const commonKeys = __common
+    ->keys
+    ->filter((k) => k[0] != "_")
+    ->print

@@ -852,7 +852,7 @@ export class VM {
           "Function 'insert' expects argument 'list' to be an List"
         );
       }
-      list.nodes[index?.value ?? 0] = value;
+      list.nodes.splice(index?.value ?? 0, 0, value);
       return list;
     },
     pop: (args: Node[]) => {

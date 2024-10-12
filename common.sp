@@ -17,17 +17,17 @@ const includes = (arr, value) => {
     return false
 }
 
-{args: List, fn: Function}
-const reduce = (args, fn, init) => {
-    var res = args[0]
+{arr: List, fn: Function}
+const reduce = (arr, fn, init) => {
+    var res = arr[0]
     var index = 1
     if (init) {
         res = init
         index = 0
     }
     
-    for (index..args->length, v, i) {
-        res = fn(res, args[v], i)
+    for (index..arr->length, v, i) {
+        res = fn(res, arr[v], i)
     }
     return res
 }

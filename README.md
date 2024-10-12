@@ -236,3 +236,7 @@ sprig testing/tests.sp
 ## Modules
 
 Instead of creating native NodeJS functionality on the fly, Sprig also allows you to define modules that can be imported and used in your programs. Refer to `src/modules` folder to see how these are set up and used.
+
+## Documentation
+
+Head over to the official [Sprig Dogs](https://dibs.gitbook.io/sprig-docs) to learn more about Sprig!

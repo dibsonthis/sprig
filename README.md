@@ -156,6 +156,8 @@ const commonKeys = __common
 
 Adding a `config.sp` file at the top level can set global variables and create custom operators. Anything in the `globals` object will be injected into the global scope. Operators defined in `operators` can be either unary or binary based on the number of parameters provided.
 
+These two objects can also be accessed via `__config`.
+
 ```python
 
 // config.sp

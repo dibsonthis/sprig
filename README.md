@@ -175,3 +175,11 @@ const operators = {
     },
 }
 ```
+
+More examples can be found in `testing/tests.sp`.
+
+To run those tests using the built-in Testing suite, simply run:
+
+```bash
+sprig testing/tests.sp
+```

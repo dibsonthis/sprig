@@ -175,7 +175,7 @@ const coro = () => {
 
 ## Async
 
-Since Sprig is built on top of NodeJS, async is automatically supported. However, async/await syntax is not yet supported, however asynchronous programming is available via the old school callback approach via `->then` and `->catch`.
+Since Sprig is built on top of NodeJS, async is automatically supported. For the time being, async/await syntax is not yet supported, however asynchronous programming is available via the old school callback approach via `->then` and `->catch`.
 
 ```python
     fetch("https://jsonplaceholder.typicode.com/todos/1")->then((data) => {

@@ -19,7 +19,10 @@
         "build": "tsc",
         "package": "rm -rf dist && tsc && cp common.sp dist/ && cp -r src/modules dist/modules && cp package.json dist/ && pkg ./dist --output bin/sprig",
         "bin": "sudo cp bin/sprig /usr/local/bin",
-        "deploy": "sudo npm run package && npm run bin"
+        "deploy": "sudo npm run package && npm run bin",
+        "package:win": "rmdir /s /q dist && tsc && copy common.sp dist\\ && xcopy src\\modules dist\\modules /E /I && copy package.json dist\\ && pkg ./dist --output bin\\sprig",
+        "bin:win": "copy bin\\sprig C:\\Program Files\\sprig\\sprig.exe",
+        "deploy:win": "npm run package && npm run bin"
     },
     "dependencies": {
         "express": "^4.21.0",

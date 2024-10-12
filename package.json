@@ -1,0 +1,30 @@
+{
+    "type": "commonjs",
+    "devDependencies": {
+        "ts-node": "^10.9.2",
+        "tsx": "^4.19.0"
+    },
+    "name": "sprig",
+    "version": "1.0.0",
+    "bin": {
+        "sprig": "main.js"
+    },
+    "pkg": {
+        "scripts": [
+            "node_modules/deasync/build/**/*"
+        ],
+        "assets": [
+            "common.sp",
+            "modules/**/*"
+        ]
+    },
+    "scripts": {
+        "build": "tsc",
+        "package": "rm -rf dist && tsc && cp common.sp dist/ && cp -r src/modules dist/modules && cp package.json dist/ && pkg ./dist --output bin/sprig",
+        "bin": "sudo cp bin/sprig /usr/local/bin"
+    },
+    "dependencies": {
+        "express": "^4.21.0",
+        "ws": "^8.18.0"
+    }
+}

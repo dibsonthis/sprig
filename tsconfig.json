@@ -1,0 +1,13 @@
+{
+    "compilerOptions": {
+      "module": "CommonJS",          // Use ESNext for native ES module support
+      "moduleResolution": "node",  // Resolves module imports like Node.js
+      "target": "ES2020",          // Target modern JavaScript (can be changed based on your needs)
+      "esModuleInterop": true,     // Allows compatibility with CommonJS
+      "outDir": "./dist",          // Output directory for compiled JavaScript
+      "strict": false,              // Enable all strict type-checking options
+      "skipLibCheck": true         // Skips type checking of declaration files (for performance)
+    },
+    "include": ["src", "modules/sdl"],            // Your TypeScript files go inside the `src` folder
+    "exclude": ["node_modules"]    // Exclude the node_modules directory
+  }

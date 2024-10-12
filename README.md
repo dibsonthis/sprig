@@ -163,7 +163,7 @@ These two objects can also be accessed via `__config`.
 // config.sp
 
 const globals = {
-    MODULES_PATH: "/Users/adib/Dev/Personal/Languages/newlang/modules",
+    MODULES_PATH: "/some_path/modules",
 }
 
 const operators = {

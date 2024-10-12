@@ -55,7 +55,7 @@ print(buffer->value) // { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 
 
 ## Further Examples
 
-### Proxy
+### Proxies
 
 Much like JS, we can create object proxies that whose native functionality can be intercepted via a handler object. Note that '\_' means the intercept applies to all the properties. Property keys can also be provided here for specificity.
 
@@ -137,6 +137,55 @@ const (Color) = (r = 0, g = 0, b = 0) => {
     print(c.r) // 20
     print(c.g) // 255
     print(c.b) // 0
+```
+
+## Coroutines
+
+Sprig supports coroutines out of the box. Any function that has a yield statement is automatically identified as a coroutine.
+
+```python
+const coro = () => {
+        var x = 0
+        while (true) {
+            yield x += 1
+        }
+    }
+
+    const c1 = coro();
+
+    while ((let c = c1()) <= 10) {
+        // do nothing
+    }
+
+    print(c) // 11
+
+    const coroAdvanced = (init, value) => {
+        var x = init
+        while (true) {
+            yield x += value
+        }
+    }
+
+    const cAdvanced = coroAdvanced(100);
+
+    const res = cAdvanced(20)
+
+    print(res) // 120
+```
+
+## Async
+
+Since Sprig is built on top of NodeJS, async is automatically supported. However, async/await syntax is not yet supported, however asynchronous programming is available via the old school callback approach via `->then` and `->catch`.
+
+```python
+    fetch("https://jsonplaceholder.typicode.com/todos/1")->then((data) => {
+        print("retrieved data")
+    })->catch((e) => print((e->value).message))
+
+    print("here")
+
+    // here
+    // retrieved data
 ```
 
 ## Common

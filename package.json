@@ -10,9 +10,6 @@
         "sprig": "main.js"
     },
     "pkg": {
-        "scripts": [
-            "node_modules/deasync/build/**/*"
-        ],
         "assets": [
             "common.sp",
             "modules/**/*"

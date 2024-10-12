@@ -1,4 +1,4 @@
-# Sprig - A Language Sprouting From NodeJS
+# Sprig 🌿 A Language Sprouting From NodeJS
 
 Sprig is a dynamic programming language built on NodeJS that allows developers to write efficient and powerful code. It leverages the capabilities of NodeJS while providing its own syntax and useful extensions.
 

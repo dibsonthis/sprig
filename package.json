@@ -21,7 +21,8 @@
     "scripts": {
         "build": "tsc",
         "package": "rm -rf dist && tsc && cp common.sp dist/ && cp -r src/modules dist/modules && cp package.json dist/ && pkg ./dist --output bin/sprig",
-        "bin": "sudo cp bin/sprig /usr/local/bin"
+        "bin": "sudo cp bin/sprig /usr/local/bin",
+        "deploy": "sudo npm run package && npm run bin"
     },
     "dependencies": {
         "express": "^4.21.0",

@@ -261,6 +261,13 @@ export class Lexer {
     this.advance();
 
     if (node.meta?.stringType === "special") {
+      const parentStart: Node = {
+        type: NodeTypeEnum.Operator,
+        value: "(",
+        line: this.line,
+        col: this.col,
+      };
+      this.nodes.push(parentStart);
       const splitStr: string[] = node.value.split(/({{.*?}})/);
       splitStr.forEach((e, i) => {
         if (e.match(/({{.*?}})/)) {
@@ -290,6 +297,13 @@ export class Lexer {
           this.nodes.push(plusNode);
         }
       });
+      const parenEnd: Node = {
+        type: NodeTypeEnum.Operator,
+        value: ")",
+        line: this.line,
+        col: this.col,
+      };
+      this.nodes.push(parenEnd);
     } else {
       this.nodes.push(node);
     }

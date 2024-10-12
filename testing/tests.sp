@@ -478,10 +478,10 @@ const test_list = () => {
     const first = arr->popf()
     const last = arr->pop()
     arr->remove(arr->length - 1)
-
+    
     assert(isEqual, first, -30)
     assert(isEqual, last, 450)
-    assert(isEqual, arr[0], 2)
+    assert(isEqual, arr[0], 1)
 
     while (arr->length > 0) {
         let front = arr->popf

@@ -10,7 +10,7 @@ const (Test) = (options) => {
     const isEqual = (a, b) => a == b
     const isNotEqual = (a, b) => a !== b
     const listIncludes = (ls, val) => ls->includes(val)
-    const objectHas = (obj, key) => obj[key] !== undefined
+    const objectHas = (obj, key) => obj->keys->includes(key)
 
     var results = {passed: 0, failed: 0}
     var currentFunctionName = ""

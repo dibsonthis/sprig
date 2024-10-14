@@ -31,6 +31,7 @@ const test_object = () => {
     person.bloop.c[0] = person.token * person.bloop.a
     person.bloop.e = person.bloop.d + d
 
+    assert(objectHas, person, "id")
     assert(isEqual, person.token, "_-_")
     assert(isEqual, person.id, 3.14)
     assert(isEqual, person.bloop.e, 2401.4)

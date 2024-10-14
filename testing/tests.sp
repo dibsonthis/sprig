@@ -492,7 +492,7 @@ const test_list = () => {
 }
 
 const test_imports = () => {
-    const modules_path = "/Users/adib/Dev/Personal/Languages/newlang/src/modules"
+    const modules_path = "../src/modules"
     import io : `{{modules_path}}/io/io.sp`
     assert(isNotEqual, io.readFile, undefined)
 }

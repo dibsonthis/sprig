@@ -2348,6 +2348,10 @@ export class VM {
       }
       case NodeTypeEnum.Import: {
         const importFrom = this.stack.pop();
+        const extName = path.extname(importFrom.value);
+        if (!extName.length) {
+          importFrom.value += ".sp";
+        }
         const lexer = new Lexer(importFrom.value);
         lexer.tokenize();
         const parser = new Parser(lexer.nodes, lexer.filePath);

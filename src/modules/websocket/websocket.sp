@@ -1,4 +1,4 @@
-const lib = loadLib(dirName() + "/../modules/websocket/websocket.js")
+const lib = loadLib((__vm()).vmPath + "/../modules/websocket/websocket.js")
 
 {url: String}
 const client = (url) => lib.client(url)

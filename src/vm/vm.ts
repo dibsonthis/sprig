@@ -205,9 +205,11 @@ export class VM {
         return `...${node.value}`;
       }
       case NodeTypeEnum.Native: {
-        return `native: '${
-          node.nativeNode?.name ?? "anonymous"
-        }' (${getParamNames(node.nativeNode.function)})`;
+        return `native: '${node.nativeNode?.name ?? "anonymous"}' (${
+          node.nativeNode?.builtin
+            ? "...args"
+            : getParamNames(node.nativeNode.function)
+        })`;
       }
       case NodeTypeEnum.Operator: {
         return `${this.toString(node.left)} ${node.value} ${this.toString(
@@ -446,7 +448,6 @@ export class VM {
       }
 
       const nativeArgs = args.slice(1).map((elem) => this.nodeToJS(elem));
-
       const res = native.nativeNode.function(...nativeArgs);
       return this.jsToNode(res);
     },
@@ -465,7 +466,12 @@ export class VM {
 
       const nativeArgs = args.slice(1).map((elem) => this.nodeToJS(elem));
 
-      const res = native.nativeNode.function(...nativeArgs);
+      let res;
+      if (nativeArgs.length) {
+        res = native.nativeNode.function(...nativeArgs);
+      } else {
+        res = native.nativeNode.function(nativeArgs);
+      }
       return this.newNode(NodeTypeEnum.Raw, res);
     },
     raw: (args: Node[]) => {
@@ -746,6 +752,7 @@ export class VM {
             NodeTypeEnum.String,
             vm.functionName ?? "anonymous"
           ),
+          vmPath: this.newNode(NodeTypeEnum.String, __dirname),
           locals: vm.builtins.locals([]),
         },
         true
@@ -1536,8 +1543,17 @@ export class VM {
     } else {
       symbol = this.symbols[node.value];
     }
-    // const symbol = this.tempVars[node.value] ?? this.symbols[node.value];
+
     if (!symbol) {
+      if (this.builtins.hasOwnProperty(node.value)) {
+        const native = this.newNode(NodeTypeEnum.Native);
+        native.nativeNode = {
+          name: node.value,
+          function: this.builtins[node.value],
+          builtin: true,
+        };
+        return native;
+      }
       return this.newError(`Variable '${node.value}' is not defined`);
     }
     return symbol.node;
@@ -1781,6 +1797,9 @@ export class VM {
     }
 
     if (fn.type === NodeTypeEnum.Native) {
+      if (fn.nativeNode.builtin) {
+        return this.builtins.runRaw([fn, ...args]).value;
+      }
       return this.builtins.run([fn, ...args]);
     }
 

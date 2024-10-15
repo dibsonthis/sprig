@@ -1,4 +1,4 @@
-const lib = loadLib(dirName() + "/../modules/io/io.js")
+const lib = loadLib((__vm()).vmPath + "/../modules/io/io.js")
 
 {filePath: String}
 const readFile = (filePath) => lib.readFile(filePath)

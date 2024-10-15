@@ -1,4 +1,4 @@
-const lib = loadLib(dirName() + "/../modules/server/server.js")
+const lib = loadLib((__vm()).vmPath + "/../modules/server/server.js")
 
 const new = () => lib.new()
 const use = (instance, middleware) => lib.use(instance, middleware)

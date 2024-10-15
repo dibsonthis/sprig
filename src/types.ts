@@ -186,6 +186,7 @@ export type FuncNode = {
 export type NativeNode = {
   name?: string;
   function: Function;
+  builtin?: boolean;
 };
 
 export type LibNode = {

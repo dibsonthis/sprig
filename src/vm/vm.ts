@@ -405,6 +405,19 @@ export class VM {
   }
 
   private builtins = {
+    __builtins: (args: Node[]) => {
+      const builtinsObject = this.newNode(NodeTypeEnum.Object, {}, true);
+      Object.keys(this.builtins).forEach((key) => {
+        const nativeNode = this.newNode(NodeTypeEnum.Native);
+        nativeNode.nativeNode = {
+          name: key,
+          function: this.builtins[key],
+          builtin: true,
+        };
+        builtinsObject.value[key] = nativeNode;
+      });
+      return builtinsObject;
+    },
     print: (args: Node[]) => {
       args.forEach((node) => {
         process.stdout.write(this.toString(node));
@@ -466,12 +479,12 @@ export class VM {
 
       const nativeArgs = args.slice(1).map((elem) => this.nodeToJS(elem));
 
-      let res;
-      if (nativeArgs.length) {
-        res = native.nativeNode.function(...nativeArgs);
-      } else {
-        res = native.nativeNode.function(nativeArgs);
-      }
+      let res = native.nativeNode.function(...nativeArgs);
+      // if (nativeArgs.length) {
+      //   res = native.nativeNode.function(...nativeArgs);
+      // } else {
+      //   res = native.nativeNode.function(nativeArgs);
+      // }
       return this.newNode(NodeTypeEnum.Raw, res);
     },
     raw: (args: Node[]) => {
@@ -1798,7 +1811,7 @@ export class VM {
 
     if (fn.type === NodeTypeEnum.Native) {
       if (fn.nativeNode.builtin) {
-        return this.builtins.runRaw([fn, ...args]).value;
+        return fn.nativeNode.function(args);
       }
       return this.builtins.run([fn, ...args]);
     }
@@ -1819,6 +1832,9 @@ export class VM {
     }
 
     if (fn.type === NodeTypeEnum.Native) {
+      if (fn.nativeNode.builtin) {
+        return fn.nativeNode.function(args);
+      }
       return this.builtins.run([fn, ...args]);
     }
 

@@ -493,17 +493,7 @@ export class VM {
       }
 
       const expr = args[0];
-      if (expr.type !== NodeTypeEnum.String) {
-        return this.newError(
-          "Function 'raw' expects argument 'expr' to be a String"
-        );
-      }
-      try {
-        const res = eval(expr.value);
-        return this.newNode(NodeTypeEnum.Raw, res);
-      } catch (e) {
-        return this.newError(e);
-      }
+      return this.newNode(NodeTypeEnum.Raw, expr);
     },
     eval: (args: Node[]) => {
       if (args.length !== 1 && args.length !== 2) {
@@ -2002,6 +1992,12 @@ export class VM {
         key.value = this.toString(key);
       }
 
+      if (value.type === NodeTypeEnum.Function) {
+        value.funcNode.closures["this"] = {
+          node: evaluatedObject,
+          const: false,
+        };
+      }
       evaluatedObject.value[key.value] = value;
     }
     return evaluatedObject;

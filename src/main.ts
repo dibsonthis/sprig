@@ -10,12 +10,14 @@ const debug = false;
 
 const filePath = debug ? "testing/tests.sp" : process.argv[2];
 
+const isSource = process.argv.includes("--eval") || process.argv.includes("-e");
+
 if (!filePath) {
   console.error("Sprig expects an entry point filepath - i.e sprig main.sp");
   process.exit(1);
 }
 
-const lexer = new Lexer(filePath);
+const lexer = new Lexer(filePath, isSource);
 lexer.tokenize();
 
 const parser = new Parser(lexer.nodes, lexer.filePath);
@@ -187,7 +189,3 @@ try {
 } catch (e) {}
 
 vm.evaluate();
-
-// const evaluator = new Evaluator(parser.nodes, parser.filePath);
-// process.chdir(path.dirname(filePath));
-// evaluator.evaluate();

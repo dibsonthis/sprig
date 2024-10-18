@@ -54,6 +54,15 @@ export class Lexer {
     process.exit();
   }
 
+  private errorAndContinue(message: string) {
+    console.error(
+      "\x1b[31m%s\x1b[0m",
+      `Error at (${this.line}:${this.col}) in '${path.resolve(
+        this.filePath
+      )}': ${message}`
+    );
+  }
+
   constructor(filePath: string, isSource = false) {
     if (isSource) {
       this.source = filePath;
@@ -63,7 +72,8 @@ export class Lexer {
       try {
         this.source = fs.readFileSync(this.filePath).toString();
       } catch (e) {
-        this.errorAndExit(e as string);
+        this.errorAndContinue(e as string);
+        this.source = "";
       }
     }
     this.char = this.source[this.index];

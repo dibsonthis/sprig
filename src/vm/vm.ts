@@ -368,7 +368,7 @@ export class VM {
     const generator = new Generator(parser.nodes, parser.filePath);
     generator.generate();
 
-    if (generator.generatedNodes.at(-1).type === NodeTypeEnum.Pop) {
+    if (generator.generatedNodes.at(-1)?.type === NodeTypeEnum.Pop) {
       generator.generatedNodes.pop();
     }
 
@@ -2352,6 +2352,9 @@ export class VM {
         }
         const lexer = new Lexer(importFrom.value);
         lexer.tokenize();
+        if (!lexer.nodes.length) {
+          return;
+        }
         const parser = new Parser(lexer.nodes, lexer.filePath);
         parser.parse();
         const generator = new Generator(parser.nodes, parser.filePath);

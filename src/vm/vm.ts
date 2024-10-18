@@ -1993,11 +1993,13 @@ export class VM {
       }
 
       if (value.type === NodeTypeEnum.Function) {
+        value.funcNode.name = key.value;
         value.funcNode.closures["this"] = {
           node: evaluatedObject,
           const: false,
         };
       }
+
       evaluatedObject.value[key.value] = value;
     }
     return evaluatedObject;

@@ -68,167 +68,6 @@ const test_coroutines = () => {
     assert(isEqual, res, 120)
 }
 
-const test_server = () => {
-    const {use, get, send, json, listen} = Server
-    const port = 3000
-
-    const app = Server.new()
-
-    app->get("/", (req, res) => {
-        res->send('<h1 onclick="console.log(`hello`)"> Hello World </h1>')
-    })
-
-    app->get("/users/:id", (req, res) => {
-        const id = (req->value).params.id
-        fetch("https://jsonplaceholder.typicode.com/todos/" + id, (data) => {
-            if (!data) {
-                res->json({error: {code: 404, message: `ID {{id}} not found`}})
-            } else {
-                res->json(data)
-            }
-        })
-    })
-
-    app->listen(port, () => print(`Listening on port {{port}}...`))
-}
-
-const test_websocket = () => {
-    const {client, on, send, createReadLineInterface} = Websocket
-    const {parse} = Json
-
-    const wsc = client("wss://stream.binance.com:9443/ws/btcusdt@trade")
-    const rl = createReadLineInterface()
-
-    const n = 1000
-
-    var price;
-    var lastPrice;
-    var secondLastPrice;
-
-    interval(n, () => {
-        secondLastPrice = lastPrice
-        lastPrice = price
-        const diff = (lastPrice - secondLastPrice)->truncate(3)
-        
-        const diffString = 
-            diff > 0 ? `\e[32m${{diff}}\e[0m` : `\e[31m${{diff}}\e[0m`
-
-        print(`Price: {{lastPrice}} ({{diffString}})`)
-    })
-
-    rl->on("line", (data) => {
-        wsc->send(data)
-    })
-
-    wsc->on("open", (e) => {
-        print("Opening connection")
-    })
-
-    wsc->on("message", (e) => {
-        const parsed = parse(e)
-        price = (parsed.p)->toNumber
-    })
-
-    wsc->on("close", (e) => {
-        print("Closing connection")
-    })
-}
-
-const test_sdl = () => {
-
-    const sdl_import_path = "../modules/sdl/sdl.sp"
-    import sdl : sdl_import_path
-
-    const windowOptions = {
-        title: `TESTING: {{sdl_import_path}}`,
-        resizable: true,
-    }
-
-    const window = sdl.createWindow(windowOptions)
-    const windowObject = window->value()
-
-    const _buildBuffer = jsEval(`(height, width) => {
-        const stride = width * 4
-        const buffer = Buffer.alloc(stride * height)
-
-        let offset = 0
-        for (let i = 0; i < height; i++) {
-            for (let j = 0; j < width; j++) {
-                buffer[offset++] = Math.floor(256 * i / height) // R
-                buffer[offset++] = Math.floor(256 * j / width)  // G
-                buffer[offset++] = 0                            // B
-                buffer[offset++] = 255                          // A
-            }
-        }
-
-        return buffer
-    }
-    `)
-
-
-    {height: Number, width: Number}
-    const buildBuffer = (height, width) => _buildBuffer(height, width)
-
-    const redraw = () => {
-        const height = windowObject._pixelHeight
-        const width = windowObject._pixelWidth
-        const buffer = buildBuffer(height, width)
-        sdl.render(window, width, height, width * 4, 'rgba32', buffer)
-    }
-
-    sdl.on("*", window, (e, v) => {
-        print(`{{e}} -> {{v}}`)
-        if (e == "keyDown" && v.key == "escape") {
-            exit()
-        }
-    })
-    sdl.on("resize", window, redraw)
-}
-
-const test_fetch = () => {
-    const endpoint = "https://jsonplaceholder.typicode.com/todos/"
-
-    fetch(endpoint + "1", (data) => {
-        assert(isEqual, data.id, 1)
-        return fetch(endpoint + `{{data.id + 1}}`)
-    })->then((data) => {
-        assert(isEqual, data.id, 2)
-        return fetch(endpoint + `{{data.id + 1}}`)
-    })->then((data) => {
-        assert(isEqual, data.id, 3)
-        return fetch(endpoint + `{{data.id + 1}}`)
-    })->then((data) => {
-        assert(isEqual, data.id, 4)
-    })->catch((e) => print((e->value).message))
-}
-
-const test_cache_fetch = () => {
-    var fetch_cache = {}
-
-    const cacheFetch = (endpoint, callback) => {
-        if (fetch_cache[endpoint]) {
-            return promise(callback(fetch_cache[endpoint]))
-        }
-        
-        fetch(endpoint, (data) => {
-            fetch_cache[endpoint] = data
-            callback(data)
-        })
-    }
-
-    cacheFetch("https://jsonplaceholder.typicode.com/todos/1", (data) => {
-        assert(isEqual, data.id, 1)
-    })->then(() => {
-        cacheFetch("https://jsonplaceholder.typicode.com/todos/1", (data) => {
-            assert(isEqual, data.id, 1)
-        })
-    })->then(() => {
-        cacheFetch("https://jsonplaceholder.typicode.com/todos/1", (data) => {
-            assert(isEqual, data.id, 1)
-        })
-    })->catch((e) => print((e->value).message))
-}
-
 const test_counter = () => {
     const Counter = (init = 0) => {
         var count = {
@@ -610,8 +449,23 @@ const test_breakn = () => {
     assert(isEqual, y, 5)
 }
 
-const tests = getLocalTests({
-    exclude: ["test_sdl", "test_fetch", "test_cache_fetch", "test_server", "test_websocket"]
-})
+const test_this = () => {
+    const obj = {
+        name: "John",
+        getName: () => this.name,
+        address: {
+            street: "123 Fake St.",
+            getStreet: () => this.street
+        }
+    }
+
+    const name = obj.getName()
+    const street = obj.address.getStreet()
+
+    assert(isEqual, name, "John")
+    assert(isEqual, street, "123 Fake St.")
+}
+
+const tests = getLocalTests()
 
 Test.run(...tests)

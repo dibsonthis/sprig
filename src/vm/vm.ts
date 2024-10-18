@@ -374,6 +374,7 @@ export class VM {
 
     const vm = new VM(generator.generatedNodes, parser.filePath);
     vm.parentVM = this;
+    vm.functionName = "eval";
 
     if (env) {
       for (const prop in env.value) {
@@ -675,6 +676,16 @@ export class VM {
             NodeTypeEnum.Boolean,
             coroutineFinished
           );
+
+          return res;
+        }
+        case NodeTypeEnum.Native: {
+          const res = this.newNode(NodeTypeEnum.Object, {}, true);
+          const name = node.nativeNode?.name ?? "";
+          const builtin = node.nativeNode?.builtin ?? false;
+
+          res.value.name = this.newNode(NodeTypeEnum.String, name);
+          res.value.builtin = this.newNode(NodeTypeEnum.Boolean, builtin);
 
           return res;
         }

@@ -17,6 +17,7 @@ export class VM {
   public cachedImports = {};
   public filePath: string;
   public functionName: string;
+  public meta: object = {};
 
   public parentVM: VM;
 
@@ -375,6 +376,8 @@ export class VM {
     const vm = new VM(generator.generatedNodes, parser.filePath);
     vm.parentVM = this;
     vm.functionName = "eval";
+    vm.builtins = this.builtins;
+    vm.meta = this.meta;
 
     if (env) {
       for (const prop in env.value) {

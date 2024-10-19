@@ -1,5 +1,6 @@
 const globals = {
     APP_ID: "A0001",
+    sayHi: () => print("hi")
 }
 
 const operators = {

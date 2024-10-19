@@ -390,7 +390,7 @@ export class VM {
   }
 
   public evaluateFunctionWithArgs(fn: Node, args: Node[]) {
-    if (fn.type !== NodeTypeEnum.Function) {
+    if (fn.type !== NodeTypeEnum.Function && fn.type !== NodeTypeEnum.Native) {
       return this.newNode();
     }
     this.stack.push(this.newNode(NodeTypeEnum.FunctionCallBegin));

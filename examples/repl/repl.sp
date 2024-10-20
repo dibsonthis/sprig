@@ -1,3 +1,3 @@
 const lib = loadLib("repl.js")
 
-const start = (options = {}) => lib.start(options, jsEval("this"))
+const start = (options = {}) => lib.start(options, exec("this"))

@@ -427,15 +427,15 @@
 //       const res = this.eval(node.value, env);
 //       return res;
 //     },
-//     jsEval: (args: Node[]) => {
+//     exec: (args: Node[]) => {
 //       if (args.length !== 1) {
-//         return this.newError("Function 'jsEval' expects 1 argument(s)");
+//         return this.newError("Function 'exec' expects 1 argument(s)");
 //       }
 
 //       const expr = args[0];
 //       if (expr.type !== "String") {
 //         return this.newError(
-//           "Function 'jsEval' argument 'expr' to be a string"
+//           "Function 'exec' argument 'expr' to be a string"
 //         );
 //       }
 //       try {

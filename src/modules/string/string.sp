@@ -1,6 +1,6 @@
 // Native Functions
-const _toChars = jsEval(`(str) => str ? Array.from(str) : []`)
-const _startsWith = jsEval(`(str, substr) => str.startsWith(substr)`)
+const _toChars = exec(`(str) => str ? Array.from(str) : []`)
+const _startsWith = exec(`(str, substr) => str.startsWith(substr)`)
 
 // Exported Functions
 {str: String}

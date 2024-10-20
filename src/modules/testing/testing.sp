@@ -1,7 +1,7 @@
 {options: [Object, Undefined]}
 const (Test) = (options) => {
 
-    const time = jsEval(`() => performance.now()`)
+    const time = exec(`() => performance.now()`)
     const getLocalTests = (options = {}) => {
         const locals = (__vm(1)).locals
         const tests = locals->keys->filter((key) => locals[key]->type == Function && !(options.exclude ?? [])->includes(key) && Str.startsWith(key, "test"))->map((key) => locals[key])

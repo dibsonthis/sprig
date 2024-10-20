@@ -399,7 +399,7 @@ const test_classes = () => {
 }
 
 const test_raw_classes = () => {
-    const _Buffer = jsEval(`(size) => Buffer.alloc(size)`)
+    const _Buffer = exec(`(size) => Buffer.alloc(size)`)
     const Buffer = (size) => _Buffer(size)
     
     const buffer = Buffer(100)

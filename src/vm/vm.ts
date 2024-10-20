@@ -435,15 +435,15 @@ export class VM {
       });
       return this.newNode();
     },
-    jsEval: (args: Node[]) => {
+    exec: (args: Node[]) => {
       if (args.length !== 1) {
-        return this.newError("Function 'jsEval' expects 1 argument(s)");
+        return this.newError("Function 'exec' expects 1 argument(s)");
       }
 
       const expr = args[0];
       if (expr.type !== NodeTypeEnum.String) {
         return this.newError(
-          "Function 'jsEval' expects argument 'expr' to be a string"
+          "Function 'exec' expects argument 'expr' to be a string"
         );
       }
       try {

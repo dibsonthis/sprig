@@ -44,10 +44,10 @@ print(greet("buddy")) // Hey buddy, welcome to Sprig 🌿
 ### Leveraging NodeJS on the fly
 
 ```python
-const nativeAdd = jsEval(`(a, b) => a + b`);
+const nativeAdd = exec(`(a, b) => a + b`);
 (100 + nativeAdd(20, 30))->print // 150
 
-const rawBuffer = jsEval(`(size) => Buffer.alloc(size)`)
+const rawBuffer = exec(`(size) => Buffer.alloc(size)`)
 const buffer = rawBuffer(10)
 print(buffer) // Buffer* Raw<object>
 print(buffer->value) // { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, readBigUInt64LE: native: 'readBigUInt64LE' (offset = 0), readBigUInt64BE: native: 'readBigUInt64BE' (offset = 0) ... }

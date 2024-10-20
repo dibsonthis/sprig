@@ -43,7 +43,7 @@ const slice = (arr, start, end) => {
 
 // Async Functions
 
-const _timeout = jsEval(`(n, fn, ...args) => {
+const _timeout = exec(`(n, fn, ...args) => {
     const s = setTimeout(() => {
         fn(...args)
       }, n);
@@ -55,7 +55,7 @@ const timeout = (n, fn, ...args) => {
     return _timeout(n, fn, ...args)
 }
 
-const _interval = jsEval(`(n, fn, ...args) => {
+const _interval = exec(`(n, fn, ...args) => {
     const s = setInterval(() => {
         fn(...args)
       }, n);
@@ -67,7 +67,7 @@ const interval = (n, fn, ...args) => {
     return _interval(n, fn, ...args)
 }
 
-const _fetch = jsEval(`(endpoint, ...callbacks) => {
+const _fetch = exec(`(endpoint, ...callbacks) => {
     var promise = fetch(endpoint)
     .then(response => {
         if (!response.ok) {
@@ -86,38 +86,38 @@ const _fetch = jsEval(`(endpoint, ...callbacks) => {
 {endpoint: String}
 const fetch = (endpoint, ...callbacks) => _fetch(endpoint, ...callbacks)
 
-const _then = jsEval(`(promise, callback) => {
+const _then = exec(`(promise, callback) => {
     return promise.then(callback)
 }`)
 
 {promise: Raw, callback: Function}
 const then = (promise, callback) => _then(promise, callback)
 
-const _catch = jsEval(`(promise, callback) => {
+const _catch = exec(`(promise, callback) => {
     return promise.catch(callback)
 }`)
 
 {promise: Raw, callback: Function}
 const catch = (promise, callback) => _catch(promise, callback)
 
-const _delay = jsEval(`(ms) => new Promise(resolve => setTimeout(resolve, ms))`)
+const _delay = exec(`(ms) => new Promise(resolve => setTimeout(resolve, ms))`)
 {ms: Number}
 const delay = (ms = 0) => _delay(ms)
 
-const _promise = jsEval(`(value) => Promise.resolve(value)`)
+const _promise = exec(`(value) => Promise.resolve(value)`)
 const promise = (value) => _promise(value)
 
 // Parsing Functions
 
-const _toNumber = jsEval(`(value) => parseFloat(value)`)
+const _toNumber = exec(`(value) => parseFloat(value)`)
 const toNumber = (value) => _toNumber(value)
 
-const _toString = jsEval("(value) => `${value}`")
+const _toString = exec("(value) => `${value}`")
 const toString = (value) => _toString(value)
 
 // Numeric Functions
 
-const _truncate = jsEval(`(floatNumber, decimals) => {
+const _truncate = exec(`(floatNumber, decimals) => {
     const factor = Math.pow(10, decimals);
     return Math.trunc(floatNumber * factor) / factor;
 }`)

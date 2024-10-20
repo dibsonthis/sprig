@@ -1,4 +1,4 @@
-const _parse = jsEval(`(str) => {
+const _parse = exec(`(str) => {
     try {
         return JSON.parse(str)
     } catch(e) {
@@ -6,7 +6,7 @@ const _parse = jsEval(`(str) => {
     }
 }`)
 
-const _stringify = jsEval(`(obj) => {
+const _stringify = exec(`(obj) => {
     try {
         return JSON.stringify(obj)
     } catch(e) {

@@ -19,6 +19,9 @@ export class VM {
   public functionName: string;
   public meta: object = {};
 
+  // flags
+  public injectBuiltins: boolean;
+
   public parentVM: VM;
 
   private errorAndContinue(message: string, node?: Node) {
@@ -63,8 +66,8 @@ export class VM {
   private newError = (message: string): Node => ({
     type: NodeTypeEnum.Error,
     value: message,
-    line: this.node.line,
-    col: this.node.col,
+    line: this.node?.line ?? 0,
+    col: this.node?.col ?? 0,
     evaluated: true,
   });
 
@@ -371,6 +374,10 @@ export class VM {
     vm.functionName = "eval";
     vm.builtins = this.builtins;
     vm.meta = this.meta;
+    vm.injectBuiltins = this.injectBuiltins;
+    if (this.injectBuiltins) {
+      vm.builtins = this.builtins;
+    }
 
     if (env) {
       for (const prop in env.value) {
@@ -410,7 +417,7 @@ export class VM {
     return this.jsToNode(res);
   }
 
-  private builtins = {
+  public builtins = {
     __builtins: (args: Node[]) => {
       const builtinsObject = this.newNode(NodeTypeEnum.Object, {}, true);
       Object.keys(this.builtins).forEach((key) => {
@@ -1792,6 +1799,10 @@ export class VM {
     vm.operators = this.operators;
     vm.parentVM = this;
     vm.functionName = fn.funcNode?.name ?? "anonymous";
+    vm.injectBuiltins = this.injectBuiltins;
+    if (this.injectBuiltins) {
+      vm.builtins = this.builtins;
+    }
 
     // First call of coroutine
     if (fn.funcNode.isCoroutine && fn.funcNode.coroutineIndex === undefined) {
@@ -2295,6 +2306,10 @@ export class VM {
         const vm = new VM(generator.generatedNodes, generator.filePath);
         vm.operators = this.operators;
         vm.parentVM = this;
+        vm.injectBuiltins = this.injectBuiltins;
+        if (this.injectBuiltins) {
+          vm.builtins = this.builtins;
+        }
 
         Object.keys(this.symbols).forEach((k) => {
           const symbol = this.symbols[k];

@@ -1,4 +1,10 @@
-import { NodeType, Node, NodeTypeEnum } from "../types";
+import { Node, NodeTypeEnum } from "../types";
+import { Lexer } from "../lexer/lexer";
+import { Parser } from "../parser/parser";
+import { Generator } from "../generator/generator";
+import { VM } from "../vm/vm";
+import fs from "fs";
+import path from "path";
 
 export const node = (
   type: NodeTypeEnum = NodeTypeEnum.Undefined,
@@ -71,4 +77,125 @@ export const getParamNames = (func: Function) => {
     .map((param) => param.trim())
     .filter((param) => param) // Filter out any empty strings
     .join(", ");
+};
+
+export const injectCommonAndModules = (
+  vm: VM,
+  commonPath: string,
+  modulesPath: string
+) => {
+  // Common
+  try {
+    const common = fs.readFileSync(commonPath);
+    const commonLexer = new Lexer(common.toString(), true);
+    commonLexer.filePath = commonPath;
+    commonLexer.tokenize();
+
+    const commonParser = new Parser(commonLexer.nodes, commonLexer.filePath);
+    commonParser.parse();
+
+    const commonGenerator = new Generator(
+      commonParser.nodes,
+      commonParser.filePath
+    );
+    commonGenerator.generate();
+
+    const commonVM = new VM(
+      commonGenerator.generatedNodes,
+      commonParser.filePath
+    );
+
+    commonVM.evaluate();
+
+    Object.keys(commonVM.symbols).forEach((k) => {
+      commonVM.symbols[k].isGlobal = true;
+    });
+
+    vm.symbols = { ...vm.symbols, ...commonVM.symbols };
+
+    const moduleObject = commonParser.newNode(NodeTypeEnum.Object, {});
+    moduleObject.evaluated = true;
+    Object.keys(commonVM.symbols).forEach((key) => {
+      moduleObject.value[key] = commonVM.symbols[key].node;
+    });
+    vm.symbols.__common = { node: moduleObject, const: false, isGlobal: true };
+  } catch (e) {
+    console.warn(
+      "Warning: File not found: 'common.sp' - common functions have not been imported"
+    );
+  }
+
+  // Modules
+  try {
+    const moduleNames = fs.readdirSync(modulesPath);
+
+    const moduleNameMap = {
+      io: "Io",
+      string: "Str",
+      json: "Json",
+      websocket: "Websocket",
+      server: "Server",
+      testing: "Testing",
+      core: "Core",
+    };
+
+    moduleNames.forEach((moduleName) => {
+      const modulePath = path.join(
+        modulesPath,
+        `${moduleName}/${moduleName}.sp`
+      );
+      // const modulePath = __dirname + `/modules/${moduleName}/${moduleName}.sp`;
+      const module = fs.readFileSync(modulePath);
+
+      const moduleLexer = new Lexer(module.toString(), true);
+      moduleLexer.filePath = modulePath;
+      moduleLexer.tokenize();
+
+      const moduleParser = new Parser(moduleLexer.nodes, moduleLexer.filePath);
+      moduleParser.parse();
+
+      const moduleGenerator = new Generator(
+        moduleParser.nodes,
+        moduleParser.filePath
+      );
+      moduleGenerator.generate();
+
+      const moduleVM = new VM(
+        moduleGenerator.generatedNodes,
+        moduleParser.filePath
+      );
+
+      Object.keys(vm.symbols).forEach((key) => {
+        const symbol = vm.symbols[key];
+        if (symbol.isGlobal) {
+          moduleVM.symbols[key] = symbol;
+        }
+      });
+
+      try {
+        moduleVM.evaluate();
+      } catch (e) {
+        console.log(`Error in module: ${moduleName}: ${e.message}`);
+      }
+
+      const moduleObject = moduleParser.newNode(NodeTypeEnum.Object, {});
+      moduleObject.evaluated = true;
+      Object.keys(moduleVM.symbols).forEach((key) => {
+        moduleObject.value[key] = {
+          ...moduleVM.symbols[key].node,
+          meta: { hiddenProp: moduleVM.symbols[key].isGlobal },
+        };
+      });
+      vm.symbols[moduleNameMap[moduleName]] = {
+        node: moduleObject,
+        const: false,
+        isGlobal: true,
+      };
+
+      vm.symbols.__common.node.value[moduleNameMap[moduleName]] =
+        vm.symbols[moduleNameMap[moduleName]].node;
+    });
+  } catch (e) {
+    console.warn("Warning: Encountered an error while loading builtin modules");
+  }
 };

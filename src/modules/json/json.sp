@@ -25,7 +25,7 @@ const parse = (str) => {
 
 {obj: Object}
 const stringify = (obj) => {
-    const res = _stringify(str)
+    const res = _stringify(obj)
     if (res.__type__ == "error") {
         return error(res.message)
     }

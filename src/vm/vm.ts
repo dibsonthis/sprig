@@ -268,13 +268,6 @@ export class VM {
             this.evaluateFunctionWithArgs(
               node,
               args.map((e) => this.jsToNode(e))
-              // args.map((e) => this.newNode(NodeTypeEnum.Raw, e))
-              // args.map((e) => {
-              //   if (typeof e === "object") {
-              //     return this.newNode(NodeTypeEnum.Raw, e);
-              //   }
-              //   return this.jsToNode(e);
-              // })
             )
           );
         return fnNode;
@@ -551,9 +544,6 @@ export class VM {
       libObj.value = {};
 
       for (const prop in lib) {
-        // const nativeNode = this.newNode(NodeTypeEnum.Native);
-        // nativeNode.nativeNode = { name: prop, function: lib[prop] };
-        // libObj.value[prop] = nativeNode;
         libObj.value[prop] = this.jsToNode(lib[prop]);
       }
 
@@ -1477,8 +1467,6 @@ export class VM {
         }
 
         return this.newError(`Operator '${node.value}' is not defined`);
-        this.errorAndExit(`Operator '${node.value}' is not defined`);
-        // return this.newNode();
       }
     }
   }
@@ -2083,7 +2071,6 @@ export class VM {
       }
       case NodeTypeEnum.Return: {
         const res = this.stack.pop();
-        // this.evaluateBreak(true);
         this.resetLoops();
         return this.newNode(NodeTypeEnum.Return, res);
       }
@@ -2092,29 +2079,6 @@ export class VM {
         return this.newNode(NodeTypeEnum.Yield, res);
       }
       case NodeTypeEnum.Break: {
-        // var loopCount = 1;
-        // while (this.node) {
-        //   if (
-        //     this.node.type === NodeTypeEnum.StartForLoop ||
-        //     this.node.type === NodeTypeEnum.StartWhileLoop
-        //   ) {
-        //     loopCount++;
-        //   } else if (
-        //     this.node.type === NodeTypeEnum.ForStatement ||
-        //     this.node.type === NodeTypeEnum.WhileStatement
-        //   ) {
-        //     loopCount--;
-        //     if (loopCount === 0) {
-        //       // reset the start loop
-        //       if (this.node.type === NodeTypeEnum.ForStatement) {
-        //         this.nodes[this.node.value].forLoopStartNode.count = 0;
-        //         this.nodes[this.node.value].forLoopStartNode.arr = undefined;
-        //       }
-        //       break;
-        //     }
-        //   }
-        //   this.advance();
-        // }
         this.evaluateBreak();
         return;
       }

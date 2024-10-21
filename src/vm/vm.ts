@@ -46,7 +46,17 @@ export class VM {
     if (restricted) {
       const vm = require("vm");
 
-      const restrictedModules = ["fs", "path"];
+      const restrictedModules = [
+        "fs",
+        "path",
+        "child_process",
+        "net",
+        "http",
+        "https",
+        "os",
+        "vm",
+        "crypto",
+      ];
 
       const customRequire = (module) => {
         if (restrictedModules.includes(module)) {

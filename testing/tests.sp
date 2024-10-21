@@ -493,17 +493,3 @@ const test_core = () => {
 const tests = getLocalTests()
 
 Test.run(...tests)
-
-const script = `
-    console.log(_vm.functionName)
-    const fs = require("fs")
-    console.log(Object.keys(fs).length)
-`
-
-const g = () => exec(script)
-
-g()
-
-exec(script)
-
-g()

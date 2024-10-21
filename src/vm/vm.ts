@@ -376,7 +376,10 @@ export class VM {
     vm.meta = this.meta;
     vm.injectBuiltins = this.injectBuiltins;
     if (this.injectBuiltins) {
-      vm.builtins = this.builtins;
+      vm.builtins = {
+        ...this.builtins,
+        exec: vm.builtins.exec,
+      };
     }
 
     if (env) {
@@ -1801,7 +1804,10 @@ export class VM {
     vm.functionName = fn.funcNode?.name ?? "anonymous";
     vm.injectBuiltins = this.injectBuiltins;
     if (this.injectBuiltins) {
-      vm.builtins = this.builtins;
+      vm.builtins = {
+        ...this.builtins,
+        exec: vm.builtins.exec,
+      };
     }
 
     // First call of coroutine
@@ -2308,7 +2314,10 @@ export class VM {
         vm.parentVM = this;
         vm.injectBuiltins = this.injectBuiltins;
         if (this.injectBuiltins) {
-          vm.builtins = this.builtins;
+          vm.builtins = {
+            ...this.builtins,
+            exec: vm.builtins.exec,
+          };
         }
 
         Object.keys(this.symbols).forEach((k) => {

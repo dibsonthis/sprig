@@ -6,7 +6,7 @@ import path from "path";
 import fs from "fs";
 import { NodeTypeEnum } from "./types";
 
-const debug = false;
+const debug = true;
 
 const filePath = debug ? "testing/tests.sp" : process.argv[2];
 
@@ -86,6 +86,7 @@ try {
     websocket: "Websocket",
     server: "Server",
     testing: "Testing",
+    core: "Core",
   };
 
   moduleNames.forEach((moduleName) => {

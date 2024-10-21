@@ -432,6 +432,7 @@ const test_common = () => {
     assert(listIncludes, commonKeys, "Server")
     assert(listIncludes, commonKeys, "Str")
     assert(listIncludes, commonKeys, "Websocket")
+    assert(listIncludes, commonKeys, "Core")
 }
 
 const test_breakn = () => {

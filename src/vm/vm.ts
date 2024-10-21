@@ -402,10 +402,19 @@ export class VM {
       this.stack.push(arg);
     });
     this.stack.push(fn);
-    // this.stack.push(this.newNode(NodeTypeEnum.Number, args.length));
     const functionCall = this.newNode(NodeTypeEnum.FunctionCall);
 
     return this.evaluateFunctionCall(functionCall);
+  }
+
+  public run(native: Node, args: Node[]) {
+    if (native.type !== NodeTypeEnum.Native) {
+      return this.newNode();
+    }
+
+    const nativeArgs = args.map((elem) => this.nodeToJS(elem));
+    const res = native.nativeNode.function(...nativeArgs);
+    return this.jsToNode(res);
   }
 
   private builtins = {
@@ -421,6 +430,42 @@ export class VM {
         builtinsObject.value[key] = nativeNode;
       });
       return builtinsObject;
+    },
+    __vm: (args: Node[]) => {
+      var n = 0;
+      if (args.length == 1) {
+        const node = args[0];
+        if (node.type !== NodeTypeEnum.Number) {
+          return this.newError(
+            "Function '__vm' expects argument 'n' to be a Number"
+          );
+        }
+        n = node.value;
+      }
+
+      let vm = this;
+      for (let i = 0; i < n; i++) {
+        if (!vm.parentVM) {
+          break;
+        }
+        vm = vm.parentVM as any;
+      }
+
+      return this.newNode(
+        NodeTypeEnum.Object,
+        {
+          line: this.newNode(NodeTypeEnum.Number, vm.node?.line ?? 0),
+          col: this.newNode(NodeTypeEnum.Number, vm.node?.col ?? 0),
+          filePath: this.newNode(NodeTypeEnum.String, vm.filePath),
+          name: this.newNode(
+            NodeTypeEnum.String,
+            vm.functionName ?? "anonymous"
+          ),
+          vmPath: this.newNode(NodeTypeEnum.String, __dirname),
+          locals: vm.builtins.locals([]),
+        },
+        true
+      );
     },
     print: (args: Node[]) => {
       args.forEach((node) => {
@@ -452,44 +497,6 @@ export class VM {
       } catch (e) {
         return this.newError(e);
       }
-    },
-    run: (args: Node[]) => {
-      if (args.length < 1) {
-        return this.newError("Function 'run' expects at least 1 argument(s)");
-      }
-      const native = args[0];
-      if (native.type !== NodeTypeEnum.Native) {
-        return this.newError(
-          "Function 'run' expects argument 'nativeFn' to be a Native"
-        );
-      }
-
-      const nativeArgs = args.slice(1).map((elem) => this.nodeToJS(elem));
-      const res = native.nativeNode.function(...nativeArgs);
-      return this.jsToNode(res);
-    },
-    runRaw: (args: Node[]) => {
-      if (args.length < 1) {
-        return this.newError(
-          "Function 'runRaw' expects at least 1 argument(s)"
-        );
-      }
-      const native = args[0];
-      if (native.type !== NodeTypeEnum.Native) {
-        return this.newError(
-          "Function 'runRaw' expects argument 'nativeFn' to be a Native"
-        );
-      }
-
-      const nativeArgs = args.slice(1).map((elem) => this.nodeToJS(elem));
-
-      let res = native.nativeNode.function(...nativeArgs);
-      // if (nativeArgs.length) {
-      //   res = native.nativeNode.function(...nativeArgs);
-      // } else {
-      //   res = native.nativeNode.function(nativeArgs);
-      // }
-      return this.newNode(NodeTypeEnum.Raw, res);
     },
     raw: (args: Node[]) => {
       if (args.length !== 1) {
@@ -697,25 +704,6 @@ export class VM {
         }
       }
     },
-    finished: (args: Node[]) => {
-      if (args.length !== 1) {
-        return this.newError("Function 'finished' expects 1 argument");
-      }
-      const coroutine = args[0];
-      if (coroutine.type !== NodeTypeEnum.Function) {
-        return this.newError(
-          "Function 'finished' expects argument 'coroutine' to be a Function"
-        );
-      }
-      return this.newNode(
-        NodeTypeEnum.Boolean,
-        coroutine.funcNode?.coroutineIndex &&
-          coroutine.funcNode?.coroutineIndex >= coroutine.value?.length
-      );
-    },
-    dirName: (args: Node[]) => {
-      return this.newNode(NodeTypeEnum.String, __dirname);
-    },
     break: (args: Node[]) => {
       if (args.length !== 1) {
         return this.newError("Function 'break' expects 1 argument");
@@ -737,42 +725,6 @@ export class VM {
       return this.newNode(
         NodeTypeEnum.Return,
         this.newNode(NodeTypeEnum.Return, value)
-      );
-    },
-    __vm: (args: Node[]) => {
-      var n = 0;
-      if (args.length == 1) {
-        const node = args[0];
-        if (node.type !== NodeTypeEnum.Number) {
-          return this.newError(
-            "Function '__vm' expects argument 'n' to be a Number"
-          );
-        }
-        n = node.value;
-      }
-
-      let vm = this;
-      for (let i = 0; i < n; i++) {
-        if (!vm.parentVM) {
-          break;
-        }
-        vm = vm.parentVM as any;
-      }
-
-      return this.newNode(
-        NodeTypeEnum.Object,
-        {
-          line: this.newNode(NodeTypeEnum.Number, vm.node?.line ?? 0),
-          col: this.newNode(NodeTypeEnum.Number, vm.node?.col ?? 0),
-          filePath: this.newNode(NodeTypeEnum.String, vm.filePath),
-          name: this.newNode(
-            NodeTypeEnum.String,
-            vm.functionName ?? "anonymous"
-          ),
-          vmPath: this.newNode(NodeTypeEnum.String, __dirname),
-          locals: vm.builtins.locals([]),
-        },
-        true
       );
     },
     type: (args: Node[]) => {
@@ -1817,7 +1769,7 @@ export class VM {
       if (fn.nativeNode.builtin) {
         return fn.nativeNode.function(args);
       }
-      return this.builtins.run([fn, ...args]);
+      return this.run(fn, args);
     }
 
     if (fn.type === NodeTypeEnum.String) {
@@ -1839,7 +1791,7 @@ export class VM {
       if (fn.nativeNode.builtin) {
         return fn.nativeNode.function(args);
       }
-      return this.builtins.run([fn, ...args]);
+      return this.run(fn, args);
     }
 
     if (fn.type !== NodeTypeEnum.Function) {

@@ -486,10 +486,24 @@ const test_core = () => {
 
     // Removing builtin
     Core.resetBuiltin("asList")
-    const fn = exec(`this.builtins.asList`)
+    const fn = exec(`_vm.builtins.asList`)
     assert(isEqual, fn, undefined)
 }
 
 const tests = getLocalTests()
 
 Test.run(...tests)
+
+const script = `
+    console.log(_vm.functionName)
+    const fs = require("fs")
+    console.log(Object.keys(fs).length)
+`
+
+const g = () => exec(script)
+
+g()
+
+exec(script)
+
+g()

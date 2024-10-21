@@ -38,10 +38,36 @@ export class VM {
     process.exit(1);
   }
 
-  constructor(nodes: Node[], filePath: string = ".") {
+  constructor(nodes: Node[], filePath: string = ".", restricted = false) {
     this.nodes = nodes;
     this.node = this.nodes[0];
     this.filePath = filePath;
+
+    if (restricted) {
+      const vm = require("vm");
+
+      const restrictedModules = ["fs", "path"];
+
+      const customRequire = (module) => {
+        if (restrictedModules.includes(module)) {
+          return {};
+        }
+        return require(module);
+      };
+
+      global.eval = (code) => {
+        let context = {};
+
+        Object.getOwnPropertyNames(global).forEach((prop) => {
+          context[prop] = global[prop];
+        });
+
+        context = { ...context, require: customRequire };
+        vm.createContext(context);
+        const result = vm.runInContext(code, context);
+        return result;
+      };
+    }
   }
 
   private advance() {
@@ -360,7 +386,7 @@ export class VM {
   private eval(str: string, env?: Node): Node {
     const lexer = new Lexer(str, true);
     lexer.tokenize();
-    const parser = new Parser(lexer.nodes);
+    const parser = new Parser(lexer.nodes, "eval");
     parser.parse();
     const generator = new Generator(parser.nodes, parser.filePath);
     generator.generate();
@@ -378,7 +404,10 @@ export class VM {
     if (this.injectBuiltins) {
       vm.builtins = {
         ...this.builtins,
+        __vm: vm.builtins.__vm,
+        __builtins: vm.builtins.__builtins,
         exec: vm.builtins.exec,
+        break: vm.builtins.break,
       };
     }
 
@@ -494,6 +523,7 @@ export class VM {
           "Function 'exec' expects argument 'expr' to be a string"
         );
       }
+
       try {
         const res = eval(expr.value);
         return this.jsToNode(res);
@@ -1806,7 +1836,10 @@ export class VM {
     if (this.injectBuiltins) {
       vm.builtins = {
         ...this.builtins,
+        __vm: vm.builtins.__vm,
+        __builtins: vm.builtins.__builtins,
         exec: vm.builtins.exec,
+        break: vm.builtins.break,
       };
     }
 
@@ -2316,7 +2349,10 @@ export class VM {
         if (this.injectBuiltins) {
           vm.builtins = {
             ...this.builtins,
+            __vm: vm.builtins.__vm,
+            __builtins: vm.builtins.__builtins,
             exec: vm.builtins.exec,
+            break: vm.builtins.break,
           };
         }
 
@@ -2385,6 +2421,7 @@ export class VM {
   }
 
   public evaluate() {
+    global._vm = this;
     while (this.node) {
       const res = this.evaluateNode(this.node);
       if (res?.type === NodeTypeEnum.Return) {
@@ -2401,6 +2438,7 @@ export class VM {
       }
       this.advance();
     }
+    global._vm = this.parentVM;
     return this.stack.pop() ?? this.newNode();
   }
 }

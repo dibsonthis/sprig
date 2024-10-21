@@ -1,11 +1,11 @@
 const updateBuiltin = (name, fn) => {
     const nativeFn = exec(`(name, fn) => {
-        const vm = this.parentVM;
+        const vm = _vm.parentVM;
         if (!vm?.meta?.__originalFunctions) {
             vm.meta.__originalFunctions = {}
         }
         vm.meta.__originalFunctions[name] = vm?.builtins[name]
-        vm.builtins[name] = (args) => this.jsToNode(fn(...args.map((arg) => this.nodeToJS(arg))))
+        vm.builtins[name] = (args) => _vm.jsToNode(fn(...args.map((arg) => _vm.nodeToJS(arg))))
     }`)
 
     nativeFn(name, fn)
@@ -13,7 +13,7 @@ const updateBuiltin = (name, fn) => {
 
 const resetBuiltin = (name) => { 
     const nativeFn = exec(`(name) => {
-        const vm = this.parentVM;
+        const vm = _vm.parentVM;
         if (!(name in vm?.meta?.__originalFunctions ?? {})) {
             return
         }
@@ -31,7 +31,7 @@ const resetBuiltin = (name) => {
 
 const resetBuiltins =  () => {
     const nativeFn = exec(`() => {
-        const vm = this.parentVM;
+        const vm = _vm.parentVM;
         if (!vm?.meta?.__originalFunctions) {
             return
         }
@@ -50,7 +50,7 @@ const addOperator = (operator, fn) => {
         operator = "unary" + operator
     }
     const nativeFn = exec(`(operator, fn) => {
-        this.parentVM.operators[operator] = this.jsToNode(fn)
+        _vm.parentVM.operators[operator] = _vm.jsToNode(fn)
     }`)
 
     nativeFn(operator, fn)
@@ -58,16 +58,16 @@ const addOperator = (operator, fn) => {
 
 const removeOperator = (operator) => {
     const nativeFn = exec(`(operator) => {
-        delete this.parentVM.operators[operator];
-        delete this.parentVM.operators["unary" + operator];
+        delete _vm.parentVM.operators[operator];
+        delete _vm.parentVM.operators["unary" + operator];
     }`)
     nativeFn(operator)
 }
 
 const addVariable = (name, value) => {
     const nativeFn = exec(`(name, value) => {
-        this.parentVM.symbols[name] = {
-            node: this.jsToNode(value),
+        _vm.parentVM.symbols[name] = {
+            node: _vm.jsToNode(value),
             const: false
         }
     }`)
@@ -77,7 +77,7 @@ const addVariable = (name, value) => {
 
 const removeVariable = (name) => {
     const nativeFn = exec(`(name) => {
-        delete this.parentVM.symbols[name]
+        delete _vm.parentVM.symbols[name]
     }`)
 
     nativeFn(name)

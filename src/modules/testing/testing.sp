@@ -64,7 +64,7 @@ const (Test) = (options) => {
         
         for (results->keys->filter((e) => e != "passed" && e != "failed"), key) {
             let assertionsLength = results[key].assertions->length
-            print(`{{key}}: {{results[key].passed ? "\e[32m" : "\e[31m"}}{{results[key].passed ? "Passed" : "Failed"}}\e[0m [{{assertionsLength}} assertion{{assertionsLength > 1 ? "s" : ""}}] \e[30m({{results[key].time}} ms)\e[0m`)
+            print(`{{results[key].passed ? "\e[32m✔️\e[0m" : "\e[31m✖️\e[0m"}} {{key}}: {{results[key].passed ? "\e[32m" : "\e[31m"}}{{results[key].passed ? "Passed" : "Failed"}}\e[0m [{{assertionsLength}} assertion{{assertionsLength > 1 ? "s" : ""}}] \e[30m({{results[key].time}} ms)\e[0m`)
         }
     
         print("\e[33m\nSummary:\n\e[0m")

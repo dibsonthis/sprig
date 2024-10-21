@@ -6,7 +6,7 @@ import path from "path";
 import fs from "fs";
 import { NodeTypeEnum } from "./types";
 
-const debug = true;
+const debug = false;
 
 const filePath = debug ? "testing/tests.sp" : process.argv[2];
 

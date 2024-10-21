@@ -5,7 +5,7 @@ const updateBuiltin = (name, fn) => {
             vm.meta.__originalFunctions = {}
         }
         vm.meta.__originalFunctions[name] = vm?.builtins[name]
-        vm.builtins[name] = (args) => fn(...args.map((arg) => this.nodeToJS(arg)))
+        vm.builtins[name] = (args) => this.jsToNode(fn(...args.map((arg) => this.nodeToJS(arg))))
     }`)
 
     nativeFn(name, fn)

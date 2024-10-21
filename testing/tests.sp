@@ -467,6 +467,29 @@ const test_this = () => {
     assert(isEqual, street, "123 Fake St.")
 }
 
+const test_core = () => {
+
+    // Adding an operator
+    Core.addOperator("$avg", (a, b) => (a + b) / 2)
+    const avg = 5 $avg 3
+    assert(isEqual, avg, 4)
+    
+    // Adding a variable
+    Core.addVariable("__x__", 500)
+    assert(isEqual, __x__, 500)
+
+    // Adding builtin
+    Core.updateBuiltin("asList", (...args) => args)
+    const ls = asList(1, 2, 3, 4, 5)
+    assert(listIncludes, ls, 3)
+    assert(isEqual, ls->length, 5)
+
+    // Removing builtin
+    Core.resetBuiltin("asList")
+    const fn = exec(`this.builtins.asList`)
+    assert(isEqual, fn, undefined)
+}
+
 const tests = getLocalTests()
 
 Test.run(...tests)

@@ -22,7 +22,8 @@
         "deploy": "sudo npm run package && npm run bin",
         "package:win": "rmdir /s /q dist && tsc && copy common.sp dist\\ && xcopy src\\modules dist\\modules /E /I && copy package.json dist\\ && pkg ./dist --output bin\\sprig",
         "bin:win": "copy bin\\sprig C:\\Program Files\\sprig\\sprig.exe",
-        "deploy:win": "npm run package:win && npm run bin:win"
+        "deploy:win": "npm run package:win && npm run bin:win",
+        "repl": "node ./dist/main.js examples/repl/sprig-repl.sp"
     },
     "dependencies": {
         "express": "^4.21.0",

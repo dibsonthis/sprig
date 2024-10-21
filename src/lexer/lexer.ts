@@ -327,9 +327,19 @@ export class Lexer {
       col: this.col,
     };
 
+    const startingChar = this.char;
+
     this.advance();
 
-    while (this.char && this.char.match(/[^^a-zA-Z0-9\s()[\]{}\s"\'`]/g)) {
+    // Default regex for matching special characters
+    let regex = /[^^a-zA-Z0-9\s()[\]{}\s"\'`]/g;
+
+    // If startingChar is '$', modify regex to also allow alphanumeric characters
+    if (startingChar === "$") {
+      regex = /[^^\s()[\]{}\s"\'`]/g; // Keep original regex but exclude alphanumeric from being excluded
+    }
+
+    while (this.char && this.char.match(regex)) {
       node.value += this.char;
       this.advance();
     }

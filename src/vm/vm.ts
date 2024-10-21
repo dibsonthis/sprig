@@ -1476,7 +1476,9 @@ export class VM {
           return this.evaluateFunctionWithArgs(customOperation, [left, right]);
         }
 
-        return this.newNode();
+        return this.newError(`Operator '${node.value}' is not defined`);
+        this.errorAndExit(`Operator '${node.value}' is not defined`);
+        // return this.newNode();
       }
     }
   }

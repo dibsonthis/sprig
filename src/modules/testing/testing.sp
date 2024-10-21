@@ -8,7 +8,7 @@ const (Test) = (options) => {
         return tests
     }
     const isEqual = (a, b) => a == b
-    const isNotEqual = (a, b) => a !== b
+    const isNotEqual = (a, b) => a != b
     const listIncludes = (ls, val) => ls->includes(val)
     const objectHas = (obj, key) => obj->keys->includes(key)
 

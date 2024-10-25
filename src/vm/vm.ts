@@ -19,6 +19,8 @@ export class VM {
   public functionName: string;
   public meta: object = {};
 
+  public capturedIds = [];
+
   // flags
   public injectBuiltins: boolean;
 
@@ -1746,7 +1748,10 @@ export class VM {
     const existingSymbol = this.symbols[id.value];
 
     if (existingSymbol && this.symbols.hasOwnProperty(id.value)) {
-      if (!(existingSymbol.canChange && node.value === "let")) {
+      if (
+        !(existingSymbol.canChange && node.value === "let") &&
+        !this.capturedIds.includes(id.value)
+      ) {
         return this.newError(`Variable '${id.value}' is already defined`);
       }
     }
@@ -1839,6 +1844,7 @@ export class VM {
     }
 
     const vm = new VM(fn.value, fn.funcNode.originFilePath);
+    vm.capturedIds = fn.meta.capturedIds;
     vm.operators = this.operators;
     vm.parentVM = this;
     vm.functionName = fn.funcNode?.name ?? "anonymous";
@@ -1876,17 +1882,24 @@ export class VM {
     }
 
     if (fn.funcNode.coroutineIndex !== undefined) {
-      vm.symbols = {
-        ...fn.funcNode.closures,
-        ...fn.funcNode.coroutineSymbols,
-      };
+      // vm.symbols = fn.funcNode.closures;
+      for (const key in fn.funcNode.closures) {
+        vm.symbols[key] = fn.funcNode.closures[key];
+      }
+      for (const symbol in fn.funcNode.coroutineSymbols) {
+        vm.symbols[symbol] = fn.funcNode.coroutineSymbols[symbol];
+      }
+      // vm.symbols = {
+      //   ...fn.funcNode.closures,
+      //   ...fn.funcNode.coroutineSymbols,
+      // };
 
       vm.index = fn.funcNode.coroutineIndex;
       vm.node = vm.nodes[vm.index];
     } else {
-      vm.symbols = {
-        ...fn.funcNode.closures,
-      };
+      for (const key in fn.funcNode.closures) {
+        vm.symbols[key] = fn.funcNode.closures[key];
+      }
     }
 
     if (fnName && !vm.symbols[fnName]) {
@@ -1966,6 +1979,13 @@ export class VM {
       fn.funcNode.coroutineIndex = vm.index + 1;
       fn.funcNode.coroutineSymbols = vm.symbols;
     }
+    // else {
+    //   Object.keys(fn.funcNode.closures).forEach((key) => {
+    //     if (!fn.meta.capturedIds.includes(key)) {
+    //       delete fn.funcNode.closures[key];
+    //     }
+    //   });
+    // }
 
     return res;
   }
@@ -2021,6 +2041,18 @@ export class VM {
     return evaluatedObject;
   }
 
+  public findSymbol(id: string) {
+    let vm = this;
+    while (vm) {
+      if (vm.symbols.hasOwnProperty(id)) {
+        return vm.symbols[id];
+      }
+      vm = vm.parentVM as any;
+    }
+
+    return undefined;
+  }
+
   private evaluateFunction(node: Node) {
     if (node.evaluated) {
       return node;
@@ -2035,6 +2067,7 @@ export class VM {
       isCoroutine: node.funcNode?.isCoroutine,
       originFilePath: node.funcNode?.originFilePath,
     };
+    fn.meta = node.meta;
     fn.class = node.class;
     var numParams = this.stack.pop();
     if (numParams.type === NodeTypeEnum.Object) {
@@ -2051,11 +2084,24 @@ export class VM {
       }
     }
 
-    // TODD: optimise this, coz we're bringing EVERYTHING in
+    fn.meta?.capturedIds?.forEach((id) => {
+      const symbol = this.findSymbol(id);
+      if (symbol) {
+        fn.funcNode.closures[id] = symbol;
+        // fn.funcNode.closures[id] = {
+        //   ...symbol,
+        //   node: symbol.node,
+        //   const: false,
+        //   isClosure: true,
+        // };
+      }
+    });
 
-    for (const symbol in this.symbols) {
-      fn.funcNode.closures[symbol] = this.symbols[symbol];
-    }
+    // TODO: optimise this, coz we're bringing EVERYTHING in
+
+    // for (const symbol in this.symbols) {
+    //   fn.funcNode.closures[symbol] = this.symbols[symbol];
+    // }
 
     return fn;
   }

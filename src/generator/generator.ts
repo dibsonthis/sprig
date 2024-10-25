@@ -1,11 +1,4 @@
-import {
-  Node,
-  NodePayload,
-  NodeType,
-  FuncNode,
-  SymbolTable,
-  NodeTypeEnum,
-} from "../types";
+import { Node, SymbolTable, NodeTypeEnum } from "../types";
 import path from "path";
 
 export class Generator {
@@ -18,6 +11,8 @@ export class Generator {
   public tempVars: SymbolTable = {};
   public cachedImports = {};
   public filePath: string;
+
+  public capturedIds = [];
 
   public isCoroutine = false;
 
@@ -114,21 +109,25 @@ export class Generator {
     return flatList;
   }
 
-  private generateAccessor(node: Node) {
-    this.generateBytecode(node.left);
+  private generateAccessor(node: Node, captureIds = false) {
+    this.generateBytecode(node.left, false, captureIds);
     if (!node.right?.node) {
       this.errorAndExit("Accessor cannot be empty");
     }
-    this.generateBytecode(node.right?.node);
+    this.generateBytecode(node.right?.node, false, captureIds);
     this.generatedNodes.push(this.newNode(NodeTypeEnum.Accessor));
   }
 
-  private generateBytecode(node: Node, pop?: boolean) {
+  private generateBytecode(node: Node, pop?: boolean, captureIds?: boolean) {
     if (!node) {
       return;
     }
     switch (node.type) {
-      case NodeTypeEnum.ID:
+      case NodeTypeEnum.ID: {
+        if (captureIds) {
+          this.capturedIds.push(node.value);
+        }
+      }
       case NodeTypeEnum.String:
       case NodeTypeEnum.Number:
       case NodeTypeEnum.Boolean: {
@@ -139,15 +138,18 @@ export class Generator {
         return;
       }
       case NodeTypeEnum.Paren: {
-        this.generateBytecode(node.node, pop);
+        this.generateBytecode(node.node, pop, captureIds);
         return;
       }
       case NodeTypeEnum.Operator: {
         if (node.value === "=" && node.left.type === NodeTypeEnum.ID) {
+          if (captureIds) {
+            this.capturedIds.push(node.left.value);
+          }
           this.generatedNodes.push(
             this.newNode(NodeTypeEnum.String, node.left.value)
           );
-          this.generateBytecode(node.right);
+          this.generateBytecode(node.right, false, captureIds);
           this.generatedNodes.push(this.newNode(NodeTypeEnum.Operator, "="));
           if (pop) {
             this.generatedNodes.push(this.newNode(NodeTypeEnum.Pop));
@@ -167,14 +169,17 @@ export class Generator {
           flattened.slice(0, -1).forEach((elem: Node, index) => {
             if (index > 0) {
               if (elem.type === NodeTypeEnum.ID) {
+                if (captureIds) {
+                  this.capturedIds.push(elem.value);
+                }
                 elem.type = NodeTypeEnum.String;
               }
               if (elem.type === NodeTypeEnum.List) {
                 elem = elem.node;
               }
-              this.generateBytecode(elem);
+              this.generateBytecode(elem, false, captureIds);
             } else {
-              this.generateBytecode(elem);
+              this.generateBytecode(elem, false, captureIds);
             }
             if (index >= 1 && elem.type !== NodeTypeEnum.FunctionCall) {
               this.generatedNodes.push(this.newNode(NodeTypeEnum.Accessor));
@@ -182,13 +187,16 @@ export class Generator {
           });
           var lastElem = flattened.at(-1);
           if (lastElem.type === NodeTypeEnum.ID) {
+            if (captureIds) {
+              this.capturedIds.push(lastElem.value);
+            }
             lastElem.type = NodeTypeEnum.String;
           }
           if (lastElem.type === NodeTypeEnum.List) {
             lastElem = lastElem.node;
           }
-          this.generateBytecode(node.right);
-          this.generateBytecode(lastElem);
+          this.generateBytecode(node.right, false, captureIds);
+          this.generateBytecode(lastElem, false, captureIds);
           this.generatedNodes.push(this.newNode(NodeTypeEnum.ModifyProperty));
           if (pop) {
             this.generatedNodes.push(this.newNode(NodeTypeEnum.Pop));
@@ -206,6 +214,9 @@ export class Generator {
               if (elem.type === NodeTypeEnum.List) {
                 elem = elem.node;
               } else if (elem.type === NodeTypeEnum.ID) {
+                if (captureIds) {
+                  this.capturedIds.push(elem.value);
+                }
                 elem.type = NodeTypeEnum.String;
               }
               if (elem.type === NodeTypeEnum.Paren) {
@@ -214,9 +225,9 @@ export class Generator {
                 fnCall.right = elem;
                 elem = fnCall;
               }
-              this.generateBytecode(elem);
+              this.generateBytecode(elem, false, captureIds);
             } else {
-              this.generateBytecode(elem);
+              this.generateBytecode(elem, false, captureIds);
             }
             if (index >= 1 && elem.type !== NodeTypeEnum.MethodCall) {
               this.generatedNodes.push(this.newNode(NodeTypeEnum.Accessor));
@@ -228,13 +239,16 @@ export class Generator {
           return;
         }
         if (node.value === "->") {
-          this.generateBytecode(node.left);
+          this.generateBytecode(node.left, false, captureIds);
 
           while (node.right.type === NodeTypeEnum.Paren) {
             node.right = node.right.node;
           }
 
           if (node.right.type === NodeTypeEnum.ID) {
+            if (captureIds) {
+              this.capturedIds.push(node.right.value);
+            }
             const fnCall = this.newNode(NodeTypeEnum.FunctionCall);
             fnCall.left = this.newNode(NodeTypeEnum.ID, node.right.value);
             fnCall.right = this.newNode(NodeTypeEnum.Paren);
@@ -251,19 +265,18 @@ export class Generator {
             swapTos: true,
           };
 
-          this.generateBytecode(node.right);
-          // this.generatedNodes.at(-2).value += 1;
+          this.generateBytecode(node.right, false, captureIds);
           if (pop) {
             this.generatedNodes.push(this.newNode(NodeTypeEnum.Pop));
           }
           return;
         }
         if (node.value === "&&") {
-          this.generateBytecode(node.left);
+          this.generateBytecode(node.left, false, captureIds);
           const jump = this.newNode(NodeTypeEnum.JumpIfFalse);
           this.generatedNodes.push(jump);
           this.generatedNodes.push(this.newNode(NodeTypeEnum.Pop));
-          this.generateBytecode(node.right);
+          this.generateBytecode(node.right, false, captureIds);
           jump.value = this.generatedNodes.length - 1;
           if (pop) {
             this.generatedNodes.push(this.newNode(NodeTypeEnum.Pop));
@@ -271,11 +284,11 @@ export class Generator {
           return;
         }
         if (node.value === "||") {
-          this.generateBytecode(node.left);
+          this.generateBytecode(node.left, false, captureIds);
           const jump = this.newNode(NodeTypeEnum.JumpIfTrue);
           this.generatedNodes.push(jump);
           this.generatedNodes.push(this.newNode(NodeTypeEnum.Pop));
-          this.generateBytecode(node.right);
+          this.generateBytecode(node.right, false, captureIds);
           jump.value = this.generatedNodes.length - 1;
           if (pop) {
             this.generatedNodes.push(this.newNode(NodeTypeEnum.Pop));
@@ -289,7 +302,7 @@ export class Generator {
           op.left = node.left;
           op.right = node.right;
           eq.right = op;
-          this.generateBytecode(eq);
+          this.generateBytecode(eq, false, captureIds);
           if (pop) {
             this.generatedNodes.push(this.newNode(NodeTypeEnum.Pop));
           }
@@ -302,7 +315,7 @@ export class Generator {
           op.left = node.left;
           op.right = node.right;
           eq.right = op;
-          this.generateBytecode(eq);
+          this.generateBytecode(eq, false, captureIds);
           if (pop) {
             this.generatedNodes.push(this.newNode(NodeTypeEnum.Pop));
           }
@@ -315,7 +328,7 @@ export class Generator {
           op.left = node.left;
           op.right = node.right;
           eq.right = op;
-          this.generateBytecode(eq);
+          this.generateBytecode(eq, false, captureIds);
           if (pop) {
             this.generatedNodes.push(this.newNode(NodeTypeEnum.Pop));
           }
@@ -328,7 +341,7 @@ export class Generator {
           op.left = node.left;
           op.right = node.right;
           eq.right = op;
-          this.generateBytecode(eq);
+          this.generateBytecode(eq, false, captureIds);
           if (pop) {
             this.generatedNodes.push(this.newNode(NodeTypeEnum.Pop));
           }
@@ -343,22 +356,22 @@ export class Generator {
               "Ternary operator expects right hand side to be a ':'"
             );
           }
-          this.generateBytecode(node.left);
+          this.generateBytecode(node.left, false, captureIds);
           const jumpifFalse = this.newNode(NodeTypeEnum.JumpIfFalsePop);
           this.generatedNodes.push(jumpifFalse);
-          this.generateBytecode(node.right.left);
+          this.generateBytecode(node.right.left, false, captureIds);
           const jump = this.newNode(NodeTypeEnum.Jump);
           this.generatedNodes.push(jump);
           jumpifFalse.value = this.generatedNodes.length - 1;
-          this.generateBytecode(node.right.right);
+          this.generateBytecode(node.right.right, false, captureIds);
           jump.value = this.generatedNodes.length - 1;
           return;
         }
         if (node.value === "?!") {
-          this.generateBytecode(node.left);
+          this.generateBytecode(node.left, false, captureIds);
           const jumpifFalse = this.newNode(NodeTypeEnum.JumpIfFalsePop);
           this.generatedNodes.push(jumpifFalse);
-          this.generateBytecode(node.right);
+          this.generateBytecode(node.right, false, captureIds);
           const jump = this.newNode(NodeTypeEnum.Jump);
           this.generatedNodes.push(jump);
           jumpifFalse.value = this.generatedNodes.length - 1;
@@ -370,14 +383,14 @@ export class Generator {
           const eqOp = this.newNode(NodeTypeEnum.Operator, "!=");
           eqOp.left = node.left;
           eqOp.right = this.newNode();
-          this.generateBytecode(eqOp);
+          this.generateBytecode(eqOp, false, captureIds);
           const jumpifFalse = this.newNode(NodeTypeEnum.JumpIfFalsePop);
           this.generatedNodes.push(jumpifFalse);
-          this.generateBytecode(node.left);
+          this.generateBytecode(node.left, false, captureIds);
           const jump = this.newNode(NodeTypeEnum.Jump);
           this.generatedNodes.push(jump);
           jumpifFalse.value = this.generatedNodes.length - 1;
-          this.generateBytecode(node.right);
+          this.generateBytecode(node.right, false, captureIds);
           jump.value = this.generatedNodes.length - 1;
           return;
         }
@@ -386,15 +399,15 @@ export class Generator {
           const jump = this.newNode(NodeTypeEnum.Jump);
           statements.forEach((statement) => {
             if (statement.type === NodeTypeEnum.IfStatement) {
-              this.generateBytecode(statement.left);
+              this.generateBytecode(statement.left, false, captureIds);
               const jumpFalse = this.newNode(NodeTypeEnum.JumpIfFalse);
               this.generatedNodes.push(jumpFalse);
               this.generatedNodes.push(this.newNode(NodeTypeEnum.Pop));
-              this.generateBytecode(statement.right, pop);
+              this.generateBytecode(statement.right, pop, captureIds);
               this.generatedNodes.push(jump);
               jumpFalse.value = this.generatedNodes.length - 1;
             } else {
-              this.generateBytecode(statement, pop);
+              this.generateBytecode(statement, pop, captureIds);
             }
             jump.value = this.generatedNodes.length - 1;
           });
@@ -404,10 +417,10 @@ export class Generator {
           return;
         }
         if (node.meta?.unary) {
-          this.generateBytecode(node.right);
+          this.generateBytecode(node.right, false, captureIds);
         } else {
-          this.generateBytecode(node.left);
-          this.generateBytecode(node.right);
+          this.generateBytecode(node.left, false, captureIds);
+          this.generateBytecode(node.right, false, captureIds);
         }
         this.generatedNodes.push({
           ...node,
@@ -443,7 +456,7 @@ export class Generator {
             }
             return this.newNode(NodeTypeEnum.String, elem.value);
           });
-          this.generateBytecode(destructuredList);
+          this.generateBytecode(destructuredList, false, false);
         } else if (
           node.declNode.id.type === NodeTypeEnum.Block ||
           node.declNode.id.type === NodeTypeEnum.Object
@@ -464,10 +477,10 @@ export class Generator {
             }
             return this.newNode(NodeTypeEnum.String, elem.value);
           });
-          this.generateBytecode(destructuredList);
+          this.generateBytecode(destructuredList, false, captureIds);
         }
 
-        this.generateBytecode(node.declNode.value);
+        this.generateBytecode(node.declNode.value, false, captureIds);
         this.generatedNodes.push({
           ...node,
           declNode: { isClass },
@@ -494,11 +507,10 @@ export class Generator {
         args.forEach((arg) => {
           if (arg.type === NodeTypeEnum.Operator && arg.value === ":") {
             isNamedArg = true;
-            // this.generateBytecode(arg.left);
             this.generatedNodes.push(
               this.newNode(NodeTypeEnum.String, arg.left.value)
             );
-            this.generateBytecode(arg.right);
+            this.generateBytecode(arg.right, false, captureIds);
             this.generatedNodes.push(this.newNode(NodeTypeEnum.NamedArg));
           } else {
             if (isNamedArg) {
@@ -506,16 +518,19 @@ export class Generator {
                 "Cannot provide unnamed argument after named argument"
               );
             }
-            this.generateBytecode(arg);
+            this.generateBytecode(arg, false, captureIds);
           }
         });
         if (node.left) {
           if (node.left.type === NodeTypeEnum.ID) {
+            if (captureIds) {
+              this.capturedIds.push(node.left.value);
+            }
             this.generatedNodes.push(
               this.newNode(NodeTypeEnum.String, node.left.value)
             );
           } else {
-            this.generateBytecode(node.left);
+            this.generateBytecode(node.left, false, captureIds);
           }
         }
         // this.generatedNodes.push(this.newNode(NodeTypeEnum.Number, args.length));
@@ -556,10 +571,10 @@ export class Generator {
           }
           loopStart.forLoopStartNode.indexName = indexName.value;
         }
-        this.generateBytecode(forLoopSections[0]);
+        this.generateBytecode(forLoopSections[0], false, captureIds);
         this.generatedNodes.push(loopStart);
         const loopStartIndex = this.generatedNodes.length - 1;
-        this.generateBytecode(node.right, pop);
+        this.generateBytecode(node.right, pop, captureIds);
         this.generatedNodes.push({
           ...node,
           left: undefined,
@@ -573,10 +588,10 @@ export class Generator {
         const loopStart = this.newNode(NodeTypeEnum.StartWhileLoop);
         const loopStartIndex = this.generatedNodes.length;
         this.generatedNodes.push(loopStart);
-        this.generateBytecode(node.left);
+        this.generateBytecode(node.left, false, captureIds);
         const jumpIfFalse = this.newNode(NodeTypeEnum.JumpIfFalsePop);
         this.generatedNodes.push(jumpIfFalse);
-        this.generateBytecode(node.right, pop);
+        this.generateBytecode(node.right, pop, captureIds);
         const jump = this.newNode(NodeTypeEnum.Jump, loopStartIndex);
         this.generatedNodes.push(jump);
         jumpIfFalse.value = this.generatedNodes.length - 1;
@@ -587,15 +602,15 @@ export class Generator {
       case NodeTypeEnum.LoopStatement: {
         const flat = this.flattenChildren(node.left.node, [","]);
 
-        this.generateBytecode(flat[0]);
+        this.generateBytecode(flat[0], false, captureIds);
         this.generatedNodes.push(this.newNode(NodeTypeEnum.Pop));
 
         const currentIndex = this.generatedNodes.length - 1;
-        this.generateBytecode(flat[1]);
+        this.generateBytecode(flat[1], false, captureIds);
         const jumpIfFalse = this.newNode(NodeTypeEnum.JumpIfFalsePop);
         this.generatedNodes.push(jumpIfFalse);
-        this.generateBytecode(node.right, pop);
-        this.generateBytecode(flat[2], pop);
+        this.generateBytecode(node.right, pop, captureIds);
+        this.generateBytecode(flat[2], pop, captureIds);
         const jump = this.newNode(NodeTypeEnum.Jump);
         this.generatedNodes.push(jump);
         jump.value = currentIndex;
@@ -603,15 +618,15 @@ export class Generator {
         return;
       }
       case NodeTypeEnum.IfStatement: {
-        this.generateBytecode(node.left);
+        this.generateBytecode(node.left, false, captureIds);
         const jump = this.newNode(NodeTypeEnum.JumpIfFalsePop);
         this.generatedNodes.push(jump);
-        this.generateBytecode(node.right, pop);
+        this.generateBytecode(node.right, pop, captureIds);
         jump.value = this.generatedNodes.length - 1;
         return;
       }
       case NodeTypeEnum.Accessor: {
-        this.generateAccessor(node);
+        this.generateAccessor(node, captureIds);
         return;
       }
       case NodeTypeEnum.List: {
@@ -621,7 +636,7 @@ export class Generator {
         if (!elems) {
           elems = this.flattenChildren(node.node, [","]);
         }
-        elems.forEach((e) => this.generateBytecode(e));
+        elems.forEach((e) => this.generateBytecode(e, false, captureIds));
         this.generatedNodes.push(this.newNode(NodeTypeEnum.List, elems.length));
         if (pop) {
           this.generatedNodes.push(this.newNode(NodeTypeEnum.Pop));
@@ -634,6 +649,9 @@ export class Generator {
           if (e.type === NodeTypeEnum.ID) {
             e.left = this.newNode(NodeTypeEnum.String, e.value);
             e.right = this.newNode(NodeTypeEnum.ID, e.value);
+            if (captureIds) {
+              this.capturedIds.push(e.value);
+            }
             e.type = NodeTypeEnum.Operator;
             e.value = ":";
           }
@@ -648,10 +666,9 @@ export class Generator {
             );
           } else if (e.left.type === NodeTypeEnum.List) {
             e.left.node = this.newNode(NodeTypeEnum.String, e.left.node.value);
-            this.generateBytecode(e.left);
+            this.generateBytecode(e.left, false, captureIds);
           }
-          // this.generateBytecode(e.left);
-          this.generateBytecode(e.right);
+          this.generateBytecode(e.right, false, captureIds);
         });
         this.generatedNodes.push(
           this.newNode(NodeTypeEnum.Object, props.length)
@@ -662,7 +679,9 @@ export class Generator {
         return;
       }
       case NodeTypeEnum.Block: {
-        node.nodes.forEach((node) => this.generateBytecode(node, pop));
+        node.nodes.forEach((node) =>
+          this.generateBytecode(node, pop, captureIds)
+        );
         return;
       }
       case NodeTypeEnum.Function: {
@@ -684,7 +703,7 @@ export class Generator {
             this.generatedNodes.push(
               this.newNode(NodeTypeEnum.String, param.left.value)
             );
-            this.generateBytecode(param.right);
+            this.generateBytecode(param.right, false, captureIds);
             this.generatedNodes.push(this.newNode(NodeTypeEnum.DefaultParam));
           } else {
             if (isDefault) {
@@ -716,7 +735,7 @@ export class Generator {
           }
         });
         const generator = new Generator(nodes, this.filePath);
-        const fnByteCode = generator.generate();
+        const fnByteCode = generator.generate(true);
 
         if (fnByteCode.at(-1)?.type === NodeTypeEnum.Pop) {
           fnByteCode.pop();
@@ -729,22 +748,25 @@ export class Generator {
           closures: {},
           isCoroutine: generator.isCoroutine,
         };
+        fnNode.meta = {
+          capturedIds: generator.capturedIds,
+        };
         this.generatedNodes.push(
           this.newNode(NodeTypeEnum.Number, params.length)
         );
         if (node?.schema) {
-          this.generateBytecode(node?.schema);
+          this.generateBytecode(node?.schema, false, captureIds);
         }
         this.generatedNodes.push(fnNode);
         return;
       }
       case NodeTypeEnum.Return: {
-        this.generateBytecode(node.right);
+        this.generateBytecode(node.right, false, captureIds);
         this.generatedNodes.push(this.newNode(NodeTypeEnum.Return));
         return;
       }
       case NodeTypeEnum.Yield: {
-        this.generateBytecode(node.right);
+        this.generateBytecode(node.right, false, captureIds);
         this.generatedNodes.push(this.newNode(NodeTypeEnum.Yield));
         this.isCoroutine = true;
         return;
@@ -773,7 +795,7 @@ export class Generator {
             this.generatedNodes.push(
               this.newNode(NodeTypeEnum.String, toImport.value)
             );
-            this.generateBytecode(importFrom);
+            this.generateBytecode(importFrom, false, captureIds);
             this.generatedNodes.push(this.newNode(NodeTypeEnum.Import, 0));
           } else if (toImport.type === NodeTypeEnum.List) {
             const flattened = this.flattenChildren(toImport.node, [","]);
@@ -785,7 +807,7 @@ export class Generator {
                 this.newNode(NodeTypeEnum.String, e.value)
               );
             });
-            this.generateBytecode(importFrom);
+            this.generateBytecode(importFrom, false, captureIds);
             this.generatedNodes.push(
               this.newNode(NodeTypeEnum.Import, flattened.length)
             );
@@ -805,9 +827,9 @@ export class Generator {
     }
   }
 
-  public generate() {
+  public generate(captureIds = false) {
     while (this.node) {
-      const res = this.generateBytecode(this.node, true);
+      const res = this.generateBytecode(this.node, true, captureIds);
       this.advance();
     }
     return this.generatedNodes;

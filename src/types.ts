@@ -161,7 +161,13 @@ export type NodeType = (typeof NodeTypes)[number];
 
 export type SymbolTable = Record<
   string,
-  { node: Node; const: boolean; canChange?: boolean; isGlobal?: boolean }
+  {
+    node: Node;
+    const: boolean;
+    canChange?: boolean;
+    isGlobal?: boolean;
+    isClosure?: boolean;
+  }
 >;
 
 type DeclNode = {
@@ -224,7 +230,7 @@ export type Node = {
     stringType?: "double" | "single" | "special";
     unary?: boolean;
     runtimeChecks?: any[];
-    possibleClosures?: string[];
+    capturedIds?: string[];
     swapTos?: boolean;
     hiddenProp?: boolean;
   };

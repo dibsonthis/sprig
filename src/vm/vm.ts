@@ -401,13 +401,21 @@ export class VM {
     const parser = new Parser(lexer.nodes, "eval");
     parser.parse();
     const generator = new Generator(parser.nodes, parser.filePath);
-    generator.generate();
+    generator.generate(true);
 
     if (generator.generatedNodes.at(-1)?.type === NodeTypeEnum.Pop) {
       generator.generatedNodes.pop();
     }
 
     const vm = new VM(generator.generatedNodes, parser.filePath);
+    vm.capturedIds = generator.capturedIds;
+    this.capturedIds = [...this.capturedIds, ...vm.capturedIds];
+    generator.capturedIds.forEach((id) => {
+      const symbol = this.findSymbol(id);
+      if (symbol) {
+        this.symbols[id] = symbol;
+      }
+    });
     vm.parentVM = this;
     vm.functionName = "eval";
     vm.builtins = this.builtins;

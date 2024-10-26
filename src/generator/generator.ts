@@ -150,7 +150,7 @@ export class Generator {
             this.newNode(NodeTypeEnum.String, node.left.value)
           );
           this.generateBytecode(node.right, false, captureIds);
-          this.generatedNodes.push(this.newNode(NodeTypeEnum.Operator, "="));
+          this.generatedNodes.push(this.newNode(NodeTypeEnum.Equal));
           if (pop) {
             this.generatedNodes.push(this.newNode(NodeTypeEnum.Pop));
           }
@@ -380,7 +380,7 @@ export class Generator {
           return;
         }
         if (node.value === "??") {
-          const eqOp = this.newNode(NodeTypeEnum.Operator, "!=");
+          const eqOp = this.newNode(NodeTypeEnum.NotEqual);
           eqOp.left = node.left;
           eqOp.right = this.newNode();
           this.generateBytecode(eqOp, false, captureIds);
@@ -422,11 +422,99 @@ export class Generator {
           this.generateBytecode(node.left, false, captureIds);
           this.generateBytecode(node.right, false, captureIds);
         }
-        this.generatedNodes.push({
-          ...node,
-          left: undefined,
-          right: undefined,
-        });
+        switch (node.value) {
+          case "unary+": {
+            this.generatedNodes.push(this.newNode(NodeTypeEnum.Pos));
+            break;
+          }
+          case "unary-": {
+            this.generatedNodes.push(this.newNode(NodeTypeEnum.Neg));
+            break;
+          }
+          case "unary!": {
+            this.generatedNodes.push(this.newNode(NodeTypeEnum.Exclamation));
+            break;
+          }
+          case "unary...": {
+            this.generatedNodes.push(this.newNode(NodeTypeEnum.UnaryTripleDot));
+            break;
+          }
+          case "+": {
+            this.generatedNodes.push(this.newNode(NodeTypeEnum.Add));
+            break;
+          }
+          case "-": {
+            this.generatedNodes.push(this.newNode(NodeTypeEnum.Sub));
+            break;
+          }
+          case "*": {
+            this.generatedNodes.push(this.newNode(NodeTypeEnum.Mul));
+            break;
+          }
+          case "/": {
+            this.generatedNodes.push(this.newNode(NodeTypeEnum.Div));
+            break;
+          }
+          case "%": {
+            this.generatedNodes.push(this.newNode(NodeTypeEnum.Percent));
+            break;
+          }
+          case "^": {
+            this.generatedNodes.push(this.newNode(NodeTypeEnum.Caret));
+            break;
+          }
+          case "=": {
+            this.generatedNodes.push(this.newNode(NodeTypeEnum.Equal));
+            break;
+          }
+          case "...": {
+            this.generatedNodes.push(this.newNode(NodeTypeEnum.TripleDot));
+            break;
+          }
+          case "..": {
+            this.generatedNodes.push(this.newNode(NodeTypeEnum.DoubleDot));
+            break;
+          }
+          case "|": {
+            this.generatedNodes.push(this.newNode(NodeTypeEnum.Pipe));
+            break;
+          }
+          case "==": {
+            this.generatedNodes.push(this.newNode(NodeTypeEnum.EqualEqual));
+            break;
+          }
+          case "!=": {
+            this.generatedNodes.push(this.newNode(NodeTypeEnum.NotEqual));
+            break;
+          }
+          case "<": {
+            this.generatedNodes.push(this.newNode(NodeTypeEnum.LessThan));
+            break;
+          }
+          case ">": {
+            this.generatedNodes.push(this.newNode(NodeTypeEnum.GreaterThan));
+            break;
+          }
+          case "<=": {
+            this.generatedNodes.push(
+              this.newNode(NodeTypeEnum.LessThanOrEqual)
+            );
+            break;
+          }
+          case ">=": {
+            this.generatedNodes.push(
+              this.newNode(NodeTypeEnum.GreaterThanOrEqual)
+            );
+            break;
+          }
+          default: {
+            this.generatedNodes.push({
+              ...node,
+              left: undefined,
+              right: undefined,
+            });
+          }
+        }
         if (pop) {
           this.generatedNodes.push(this.newNode(NodeTypeEnum.Pop));
         }

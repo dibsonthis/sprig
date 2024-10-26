@@ -1057,478 +1057,32 @@ export class VM {
   private evaluateOperator(node: Node) {
     var right = this.stack.pop();
 
-    switch (node.value) {
-      case "unary+": {
+    const customOperation = this.operators[node.value];
+    if (customOperation) {
+      if (node.value.startsWith("unary")) {
         right.type === NodeTypeEnum.ID && (right = this.evaluateID(right));
+        if (right.type === NodeTypeEnum.Error) {
+          return right;
+        }
+        return this.evaluateFunctionWithArgs(customOperation, [right]);
+      }
+
+      var left = this.stack.pop();
+
+      left.type === NodeTypeEnum.ID && (left = this.evaluateID(left));
+      right.type === NodeTypeEnum.ID && (right = this.evaluateID(right));
+
+      if (left.type === NodeTypeEnum.Error) {
+        return left;
+      }
+      if (right.type === NodeTypeEnum.Error) {
         return right;
       }
-      case "unary-": {
-        right.type === NodeTypeEnum.ID && (right = this.evaluateID(right));
-        if (right.type === NodeTypeEnum.Error) {
-          return right;
-        }
-        if (right.type === NodeTypeEnum.Number) {
-          return { ...right, value: -right.value };
-        }
-        return this.newNode();
-      }
-      case "unary!": {
-        const truthy =
-          right.type === NodeTypeEnum.Boolean
-            ? right.value
-            : right.type !== NodeTypeEnum.Undefined;
-        return this.newNode(NodeTypeEnum.Boolean, !truthy);
-      }
-      case "unary...": {
-        if (right.type === NodeTypeEnum.List) {
-          right.nodes?.forEach((elem) => this.stack.push(elem));
-          return;
-        }
-        return this.newNode();
-      }
-      case "+": {
-        var left = this.stack.pop();
-        left.type === NodeTypeEnum.ID && (left = this.evaluateID(left));
-        right.type === NodeTypeEnum.ID && (right = this.evaluateID(right));
 
-        if (left.type === NodeTypeEnum.Error) {
-          return left;
-        }
-        if (right.type === NodeTypeEnum.Error) {
-          return right;
-        }
-
-        if (
-          left.type === NodeTypeEnum.Number &&
-          right.type === NodeTypeEnum.Number
-        ) {
-          return this.newNode(NodeTypeEnum.Number, left.value + right.value);
-        }
-
-        if (
-          left.type === NodeTypeEnum.String &&
-          right.type === NodeTypeEnum.String
-        ) {
-          return this.newNode(NodeTypeEnum.String, left.value + right.value);
-        }
-
-        if (
-          left.type === NodeTypeEnum.List &&
-          right.type === NodeTypeEnum.List
-        ) {
-          const newList = this.newNode(NodeTypeEnum.List);
-          newList.evaluated = true;
-          newList.nodes = [...left?.nodes, ...right?.nodes];
-          return newList;
-        }
-
-        if (
-          left.type === NodeTypeEnum.Object &&
-          right.type === NodeTypeEnum.Object
-        ) {
-          const newObject = this.newNode(NodeTypeEnum.Object);
-          newObject.evaluated = true;
-          newObject.value = { ...left?.value, ...right?.value };
-          if (left.handler || right.handler) {
-            const newHandler = this.newNode(NodeTypeEnum.Object, {
-              ...(left.handler?.value ?? {}),
-              ...(right.handler?.value ?? {}),
-            });
-            newObject.handler = newHandler;
-          }
-          return newObject;
-        }
-
-        return this.newNode();
-      }
-      case "-": {
-        var left = this.stack.pop();
-        left.type === NodeTypeEnum.ID && (left = this.evaluateID(left));
-        right.type === NodeTypeEnum.ID && (right = this.evaluateID(right));
-
-        if (left.type === NodeTypeEnum.Error) {
-          return left;
-        }
-        if (right.type === NodeTypeEnum.Error) {
-          return right;
-        }
-
-        if (
-          left.type === NodeTypeEnum.Number &&
-          right.type === NodeTypeEnum.Number
-        ) {
-          return this.newNode(NodeTypeEnum.Number, left.value - right.value);
-        }
-        return this.newNode();
-      }
-      case "*": {
-        var left = this.stack.pop();
-        left.type === NodeTypeEnum.ID && (left = this.evaluateID(left));
-        right.type === NodeTypeEnum.ID && (right = this.evaluateID(right));
-
-        if (left.type === NodeTypeEnum.Error) {
-          return left;
-        }
-        if (right.type === NodeTypeEnum.Error) {
-          return right;
-        }
-
-        if (
-          left.type === NodeTypeEnum.Number &&
-          right.type === NodeTypeEnum.Number
-        ) {
-          return this.newNode(NodeTypeEnum.Number, left.value * right.value);
-        }
-
-        if (
-          left?.type === NodeTypeEnum.Number &&
-          right?.type === NodeTypeEnum.String
-        ) {
-          const node = this.newNode(NodeTypeEnum.String, "");
-          for (let i = 0; i < left.value; i++) {
-            node.value += right.value;
-          }
-          return node;
-        }
-
-        if (
-          left?.type === NodeTypeEnum.String &&
-          right?.type === NodeTypeEnum.Number
-        ) {
-          const node = this.newNode(NodeTypeEnum.String, "");
-          for (let i = 0; i < right.value; i++) {
-            node.value += left.value;
-          }
-          return node;
-        }
-
-        if (
-          left?.type === NodeTypeEnum.Number &&
-          right?.type === NodeTypeEnum.List
-        ) {
-          const node = this.newNode(NodeTypeEnum.List);
-          node.nodes = [];
-          for (let i = 0; i < left.value; i++) {
-            const innerNode = this.newNode(NodeTypeEnum.List);
-            innerNode.nodes = right.nodes?.slice(0);
-            node.nodes.push(innerNode);
-          }
-          return node;
-        }
-
-        if (
-          left?.type === NodeTypeEnum.List &&
-          right?.type === NodeTypeEnum.Number
-        ) {
-          const node = this.newNode(NodeTypeEnum.List);
-          node.nodes = [];
-          for (let i = 0; i < right.value; i++) {
-            const innerNode = this.newNode(NodeTypeEnum.List);
-            innerNode.nodes = left.nodes?.slice(0);
-            node.nodes.push(innerNode);
-          }
-          return node;
-        }
-
-        return this.newNode();
-      }
-      case "/": {
-        var left = this.stack.pop();
-        left.type === NodeTypeEnum.ID && (left = this.evaluateID(left));
-        right.type === NodeTypeEnum.ID && (right = this.evaluateID(right));
-
-        if (left.type === NodeTypeEnum.Error) {
-          return left;
-        }
-        if (right.type === NodeTypeEnum.Error) {
-          return right;
-        }
-
-        if (
-          left.type === NodeTypeEnum.Number &&
-          right.type === NodeTypeEnum.Number
-        ) {
-          return this.newNode(NodeTypeEnum.Number, left.value / right.value);
-        }
-        return this.newNode();
-      }
-      case "%": {
-        var left = this.stack.pop();
-        left.type === NodeTypeEnum.ID && (left = this.evaluateID(left));
-        right.type === NodeTypeEnum.ID && (right = this.evaluateID(right));
-
-        if (left.type === NodeTypeEnum.Error) {
-          return left;
-        }
-        if (right.type === NodeTypeEnum.Error) {
-          return right;
-        }
-
-        if (
-          left.type === NodeTypeEnum.Number &&
-          right.type === NodeTypeEnum.Number
-        ) {
-          return this.newNode(NodeTypeEnum.Number, left.value % right.value);
-        }
-        return this.newNode();
-      }
-      case "^": {
-        var left = this.stack.pop();
-        left.type === NodeTypeEnum.ID && (left = this.evaluateID(left));
-        right.type === NodeTypeEnum.ID && (right = this.evaluateID(right));
-
-        if (left.type === NodeTypeEnum.Error) {
-          return left;
-        }
-        if (right.type === NodeTypeEnum.Error) {
-          return right;
-        }
-
-        if (
-          left.type === NodeTypeEnum.Number &&
-          right.type === NodeTypeEnum.Number
-        ) {
-          return this.newNode(NodeTypeEnum.Number, left.value ** right.value);
-        }
-        return this.newNode();
-      }
-      case "=": {
-        var left = this.stack.pop();
-        right.type === NodeTypeEnum.ID && (right = this.evaluateID(right));
-
-        if (right.type === NodeTypeEnum.Error) {
-          return right;
-        }
-
-        if (left.type === NodeTypeEnum.String) {
-          const symbol = this.symbols[left.value];
-          if (!symbol) {
-            return this.newError(`Variable '${left.value}' is undefined`);
-          }
-          if (symbol.const) {
-            return this.newError(
-              `Cannot reassign value of const variable '${left.value}'`
-            );
-          }
-          this.symbols[left.value].node = right;
-          return right;
-        }
-        return this.newNode();
-      }
-      case "...": {
-        var left = this.stack.pop();
-        left.type === NodeTypeEnum.ID && (left = this.evaluateID(left));
-        right.type === NodeTypeEnum.ID && (right = this.evaluateID(right));
-
-        if (left.type === NodeTypeEnum.Error) {
-          return left;
-        }
-        if (right.type === NodeTypeEnum.Error) {
-          return right;
-        }
-
-        if (
-          left.type === NodeTypeEnum.Number &&
-          right.type === NodeTypeEnum.Number
-        ) {
-          const res = this.evaluateRangeOperator(left, right);
-          res.evaluated = true;
-          return res;
-        }
-        return this.newError("Range operands must be of type Number");
-      }
-      case "..": {
-        var left = this.stack.pop();
-        left.type === NodeTypeEnum.ID && (left = this.evaluateID(left));
-        right.type === NodeTypeEnum.ID && (right = this.evaluateID(right));
-
-        if (left.type === NodeTypeEnum.Error) {
-          return left;
-        }
-        if (right.type === NodeTypeEnum.Error) {
-          return right;
-        }
-
-        if (
-          left.type === NodeTypeEnum.Number &&
-          right.type === NodeTypeEnum.Number
-        ) {
-          const res = this.evaluateRangeOperator(left, right);
-          res.nodes = res.nodes.slice(0, -1);
-          res.evaluated = true;
-          return res;
-        }
-        return this.newError("Range operands must be of type Number");
-      }
-      case "|": {
-        var left = this.stack.pop();
-        left.type === NodeTypeEnum.ID && (left = this.evaluateID(left));
-        right.type === NodeTypeEnum.ID && (right = this.evaluateID(right));
-
-        if (left.type === NodeTypeEnum.Error) {
-          return left;
-        }
-        if (right.type === NodeTypeEnum.Error) {
-          return right;
-        }
-
-        if (
-          left.type === NodeTypeEnum.List &&
-          right.type === NodeTypeEnum.Number
-        ) {
-          const newList = this.newNode(NodeTypeEnum.List);
-          newList.evaluated = true;
-
-          const subListA = this.newNode(NodeTypeEnum.List);
-          subListA.evaluated = true;
-          subListA.nodes = left?.nodes?.slice(0, right.value);
-
-          const subListB = this.newNode(NodeTypeEnum.List);
-          subListB.evaluated = true;
-          subListB.nodes = left?.nodes?.slice(right.value);
-
-          newList.nodes = [subListA, subListB];
-          return newList;
-        }
-        return this.newNode();
-      }
-      case "==": {
-        var left = this.stack.pop();
-        left.type === NodeTypeEnum.ID && (left = this.evaluateID(left));
-        right.type === NodeTypeEnum.ID && (right = this.evaluateID(right));
-
-        if (left.type === NodeTypeEnum.Error) {
-          return left;
-        }
-        if (right.type === NodeTypeEnum.Error) {
-          return right;
-        }
-
-        if (left.type !== right.type) {
-          return this.newNode(NodeTypeEnum.Boolean, false);
-        }
-
-        return this.newNode(NodeTypeEnum.Boolean, left?.value === right?.value);
-      }
-      case "!=": {
-        var left = this.stack.pop();
-        left.type === NodeTypeEnum.ID && (left = this.evaluateID(left));
-        right.type === NodeTypeEnum.ID && (right = this.evaluateID(right));
-
-        if (left.type === NodeTypeEnum.Error) {
-          return left;
-        }
-        if (right.type === NodeTypeEnum.Error) {
-          return right;
-        }
-
-        if (left.type !== right.type) {
-          return this.newNode(NodeTypeEnum.Boolean, true);
-        }
-
-        return this.newNode(NodeTypeEnum.Boolean, left?.value !== right?.value);
-      }
-      case "<": {
-        var left = this.stack.pop();
-        left.type === NodeTypeEnum.ID && (left = this.evaluateID(left));
-        right.type === NodeTypeEnum.ID && (right = this.evaluateID(right));
-
-        if (left.type === NodeTypeEnum.Error) {
-          return left;
-        }
-        if (right.type === NodeTypeEnum.Error) {
-          return right;
-        }
-
-        if (left.type !== right.type) {
-          return this.newNode(NodeTypeEnum.Boolean, false);
-        }
-
-        return this.newNode(NodeTypeEnum.Boolean, left?.value < right?.value);
-      }
-      case ">": {
-        var left = this.stack.pop();
-        left.type === NodeTypeEnum.ID && (left = this.evaluateID(left));
-        right.type === NodeTypeEnum.ID && (right = this.evaluateID(right));
-
-        if (left.type === NodeTypeEnum.Error) {
-          return left;
-        }
-        if (right.type === NodeTypeEnum.Error) {
-          return right;
-        }
-
-        if (left.type !== right.type) {
-          return this.newNode(NodeTypeEnum.Boolean, false);
-        }
-
-        return this.newNode(NodeTypeEnum.Boolean, left?.value > right?.value);
-      }
-      case "<=": {
-        var left = this.stack.pop();
-        left.type === NodeTypeEnum.ID && (left = this.evaluateID(left));
-        right.type === NodeTypeEnum.ID && (right = this.evaluateID(right));
-
-        if (left.type === NodeTypeEnum.Error) {
-          return left;
-        }
-        if (right.type === NodeTypeEnum.Error) {
-          return right;
-        }
-
-        if (left.type !== right.type) {
-          return this.newNode(NodeTypeEnum.Boolean, false);
-        }
-
-        return this.newNode(NodeTypeEnum.Boolean, left?.value <= right?.value);
-      }
-      case ">=": {
-        var left = this.stack.pop();
-        left.type === NodeTypeEnum.ID && (left = this.evaluateID(left));
-        right.type === NodeTypeEnum.ID && (right = this.evaluateID(right));
-
-        if (left.type === NodeTypeEnum.Error) {
-          return left;
-        }
-        if (right.type === NodeTypeEnum.Error) {
-          return right;
-        }
-
-        if (left.type !== right.type) {
-          return this.newNode(NodeTypeEnum.Boolean, false);
-        }
-
-        return this.newNode(NodeTypeEnum.Boolean, left?.value >= right?.value);
-      }
-
-      default: {
-        const customOperation = this.operators[node.value];
-        if (customOperation) {
-          if (node.value.startsWith("unary")) {
-            right.type === NodeTypeEnum.ID && (right = this.evaluateID(right));
-            if (right.type === NodeTypeEnum.Error) {
-              return right;
-            }
-            return this.evaluateFunctionWithArgs(customOperation, [right]);
-          }
-
-          var left = this.stack.pop();
-          left.type === NodeTypeEnum.ID && (left = this.evaluateID(left));
-          right.type === NodeTypeEnum.ID && (right = this.evaluateID(right));
-
-          if (left.type === NodeTypeEnum.Error) {
-            return left;
-          }
-          if (right.type === NodeTypeEnum.Error) {
-            return right;
-          }
-
-          return this.evaluateFunctionWithArgs(customOperation, [left, right]);
-        }
-
-        return this.newError(`Operator '${node.value}' is not defined`);
-      }
+      return this.evaluateFunctionWithArgs(customOperation, [left, right]);
     }
+
+    return this.newError(`Operator '${node.value}' is not defined`);
   }
 
   private evaluateRangeOperator(left: Node, right: Node) {
@@ -2477,6 +2031,468 @@ export class VM {
           }
         }
         return;
+      }
+      case NodeTypeEnum.Pos: {
+        var right = this.stack.pop();
+        right.type === NodeTypeEnum.ID && (right = this.evaluateID(right));
+        return right;
+      }
+      case NodeTypeEnum.Neg: {
+        var right = this.stack.pop();
+        right.type === NodeTypeEnum.ID && (right = this.evaluateID(right));
+        if (right.type === NodeTypeEnum.Error) {
+          return right;
+        }
+        if (right.type === NodeTypeEnum.Number) {
+          return { ...right, value: -right.value };
+        }
+        return this.newNode();
+      }
+      case NodeTypeEnum.Exclamation: {
+        var right = this.stack.pop();
+        const truthy =
+          right.type === NodeTypeEnum.Boolean
+            ? right.value
+            : right.type !== NodeTypeEnum.Undefined;
+        return this.newNode(NodeTypeEnum.Boolean, !truthy);
+      }
+      case NodeTypeEnum.UnaryTripleDot: {
+        var right = this.stack.pop();
+        if (right.type === NodeTypeEnum.List) {
+          right.nodes?.forEach((elem) => this.stack.push(elem));
+          return;
+        }
+        return this.newNode();
+      }
+      case NodeTypeEnum.Add: {
+        var right = this.stack.pop();
+        var left = this.stack.pop();
+        left.type === NodeTypeEnum.ID && (left = this.evaluateID(left));
+        right.type === NodeTypeEnum.ID && (right = this.evaluateID(right));
+
+        if (left.type === NodeTypeEnum.Error) {
+          return left;
+        }
+        if (right.type === NodeTypeEnum.Error) {
+          return right;
+        }
+
+        if (
+          left.type === NodeTypeEnum.Number &&
+          right.type === NodeTypeEnum.Number
+        ) {
+          return this.newNode(NodeTypeEnum.Number, left.value + right.value);
+        }
+
+        if (
+          left.type === NodeTypeEnum.String &&
+          right.type === NodeTypeEnum.String
+        ) {
+          return this.newNode(NodeTypeEnum.String, left.value + right.value);
+        }
+
+        if (
+          left.type === NodeTypeEnum.List &&
+          right.type === NodeTypeEnum.List
+        ) {
+          const newList = this.newNode(NodeTypeEnum.List);
+          newList.evaluated = true;
+          newList.nodes = [...left?.nodes, ...right?.nodes];
+          return newList;
+        }
+
+        if (
+          left.type === NodeTypeEnum.Object &&
+          right.type === NodeTypeEnum.Object
+        ) {
+          const newObject = this.newNode(NodeTypeEnum.Object);
+          newObject.evaluated = true;
+          newObject.value = { ...left?.value, ...right?.value };
+          if (left.handler || right.handler) {
+            const newHandler = this.newNode(NodeTypeEnum.Object, {
+              ...(left.handler?.value ?? {}),
+              ...(right.handler?.value ?? {}),
+            });
+            newObject.handler = newHandler;
+          }
+          return newObject;
+        }
+
+        return this.newNode();
+      }
+      case NodeTypeEnum.Sub: {
+        var right = this.stack.pop();
+        var left = this.stack.pop();
+        left.type === NodeTypeEnum.ID && (left = this.evaluateID(left));
+        right.type === NodeTypeEnum.ID && (right = this.evaluateID(right));
+
+        if (left.type === NodeTypeEnum.Error) {
+          return left;
+        }
+        if (right.type === NodeTypeEnum.Error) {
+          return right;
+        }
+
+        if (
+          left.type === NodeTypeEnum.Number &&
+          right.type === NodeTypeEnum.Number
+        ) {
+          return this.newNode(NodeTypeEnum.Number, left.value - right.value);
+        }
+        return this.newNode();
+      }
+      case NodeTypeEnum.Mul: {
+        var right = this.stack.pop();
+        var left = this.stack.pop();
+        left.type === NodeTypeEnum.ID && (left = this.evaluateID(left));
+        right.type === NodeTypeEnum.ID && (right = this.evaluateID(right));
+
+        if (left.type === NodeTypeEnum.Error) {
+          return left;
+        }
+        if (right.type === NodeTypeEnum.Error) {
+          return right;
+        }
+
+        if (
+          left.type === NodeTypeEnum.Number &&
+          right.type === NodeTypeEnum.Number
+        ) {
+          return this.newNode(NodeTypeEnum.Number, left.value * right.value);
+        }
+
+        if (
+          left?.type === NodeTypeEnum.Number &&
+          right?.type === NodeTypeEnum.String
+        ) {
+          const node = this.newNode(NodeTypeEnum.String, "");
+          for (let i = 0; i < left.value; i++) {
+            node.value += right.value;
+          }
+          return node;
+        }
+
+        if (
+          left?.type === NodeTypeEnum.String &&
+          right?.type === NodeTypeEnum.Number
+        ) {
+          const node = this.newNode(NodeTypeEnum.String, "");
+          for (let i = 0; i < right.value; i++) {
+            node.value += left.value;
+          }
+          return node;
+        }
+
+        if (
+          left?.type === NodeTypeEnum.Number &&
+          right?.type === NodeTypeEnum.List
+        ) {
+          const node = this.newNode(NodeTypeEnum.List);
+          node.nodes = [];
+          for (let i = 0; i < left.value; i++) {
+            const innerNode = this.newNode(NodeTypeEnum.List);
+            innerNode.nodes = right.nodes?.slice(0);
+            node.nodes.push(innerNode);
+          }
+          return node;
+        }
+
+        if (
+          left?.type === NodeTypeEnum.List &&
+          right?.type === NodeTypeEnum.Number
+        ) {
+          const node = this.newNode(NodeTypeEnum.List);
+          node.nodes = [];
+          for (let i = 0; i < right.value; i++) {
+            const innerNode = this.newNode(NodeTypeEnum.List);
+            innerNode.nodes = left.nodes?.slice(0);
+            node.nodes.push(innerNode);
+          }
+          return node;
+        }
+
+        return this.newNode();
+      }
+      case NodeTypeEnum.Div: {
+        var right = this.stack.pop();
+        var left = this.stack.pop();
+        left.type === NodeTypeEnum.ID && (left = this.evaluateID(left));
+        right.type === NodeTypeEnum.ID && (right = this.evaluateID(right));
+
+        if (left.type === NodeTypeEnum.Error) {
+          return left;
+        }
+        if (right.type === NodeTypeEnum.Error) {
+          return right;
+        }
+
+        if (
+          left.type === NodeTypeEnum.Number &&
+          right.type === NodeTypeEnum.Number
+        ) {
+          return this.newNode(NodeTypeEnum.Number, left.value / right.value);
+        }
+        return this.newNode();
+      }
+      case NodeTypeEnum.Percent: {
+        var right = this.stack.pop();
+        var left = this.stack.pop();
+        left.type === NodeTypeEnum.ID && (left = this.evaluateID(left));
+        right.type === NodeTypeEnum.ID && (right = this.evaluateID(right));
+
+        if (left.type === NodeTypeEnum.Error) {
+          return left;
+        }
+        if (right.type === NodeTypeEnum.Error) {
+          return right;
+        }
+
+        if (
+          left.type === NodeTypeEnum.Number &&
+          right.type === NodeTypeEnum.Number
+        ) {
+          return this.newNode(NodeTypeEnum.Number, left.value % right.value);
+        }
+        return this.newNode();
+      }
+      case NodeTypeEnum.Caret: {
+        var right = this.stack.pop();
+        var left = this.stack.pop();
+        left.type === NodeTypeEnum.ID && (left = this.evaluateID(left));
+        right.type === NodeTypeEnum.ID && (right = this.evaluateID(right));
+
+        if (left.type === NodeTypeEnum.Error) {
+          return left;
+        }
+        if (right.type === NodeTypeEnum.Error) {
+          return right;
+        }
+
+        if (
+          left.type === NodeTypeEnum.Number &&
+          right.type === NodeTypeEnum.Number
+        ) {
+          return this.newNode(NodeTypeEnum.Number, left.value ** right.value);
+        }
+        return this.newNode();
+      }
+      case NodeTypeEnum.Equal: {
+        var right = this.stack.pop();
+        var left = this.stack.pop();
+        right.type === NodeTypeEnum.ID && (right = this.evaluateID(right));
+
+        if (right.type === NodeTypeEnum.Error) {
+          return right;
+        }
+
+        if (left.type === NodeTypeEnum.String) {
+          const symbol = this.symbols[left.value];
+          if (!symbol) {
+            return this.newError(`Variable '${left.value}' is undefined`);
+          }
+          if (symbol.const) {
+            return this.newError(
+              `Cannot reassign value of const variable '${left.value}'`
+            );
+          }
+          this.symbols[left.value].node = right;
+          return right;
+        }
+        return this.newNode();
+      }
+      case NodeTypeEnum.TripleDot: {
+        var right = this.stack.pop();
+        var left = this.stack.pop();
+        left.type === NodeTypeEnum.ID && (left = this.evaluateID(left));
+        right.type === NodeTypeEnum.ID && (right = this.evaluateID(right));
+
+        if (left.type === NodeTypeEnum.Error) {
+          return left;
+        }
+        if (right.type === NodeTypeEnum.Error) {
+          return right;
+        }
+
+        if (
+          left.type === NodeTypeEnum.Number &&
+          right.type === NodeTypeEnum.Number
+        ) {
+          const res = this.evaluateRangeOperator(left, right);
+          res.evaluated = true;
+          return res;
+        }
+        return this.newError("Range operands must be of type Number");
+      }
+      case NodeTypeEnum.DoubleDot: {
+        var right = this.stack.pop();
+        var left = this.stack.pop();
+        left.type === NodeTypeEnum.ID && (left = this.evaluateID(left));
+        right.type === NodeTypeEnum.ID && (right = this.evaluateID(right));
+
+        if (left.type === NodeTypeEnum.Error) {
+          return left;
+        }
+        if (right.type === NodeTypeEnum.Error) {
+          return right;
+        }
+
+        if (
+          left.type === NodeTypeEnum.Number &&
+          right.type === NodeTypeEnum.Number
+        ) {
+          const res = this.evaluateRangeOperator(left, right);
+          res.nodes = res.nodes.slice(0, -1);
+          res.evaluated = true;
+          return res;
+        }
+        return this.newError("Range operands must be of type Number");
+      }
+      case NodeTypeEnum.Pipe: {
+        var right = this.stack.pop();
+        var left = this.stack.pop();
+        left.type === NodeTypeEnum.ID && (left = this.evaluateID(left));
+        right.type === NodeTypeEnum.ID && (right = this.evaluateID(right));
+
+        if (left.type === NodeTypeEnum.Error) {
+          return left;
+        }
+        if (right.type === NodeTypeEnum.Error) {
+          return right;
+        }
+
+        if (
+          left.type === NodeTypeEnum.List &&
+          right.type === NodeTypeEnum.Number
+        ) {
+          const newList = this.newNode(NodeTypeEnum.List);
+          newList.evaluated = true;
+
+          const subListA = this.newNode(NodeTypeEnum.List);
+          subListA.evaluated = true;
+          subListA.nodes = left?.nodes?.slice(0, right.value);
+
+          const subListB = this.newNode(NodeTypeEnum.List);
+          subListB.evaluated = true;
+          subListB.nodes = left?.nodes?.slice(right.value);
+
+          newList.nodes = [subListA, subListB];
+          return newList;
+        }
+        return this.newNode();
+      }
+      case NodeTypeEnum.EqualEqual: {
+        var right = this.stack.pop();
+        var left = this.stack.pop();
+        left.type === NodeTypeEnum.ID && (left = this.evaluateID(left));
+        right.type === NodeTypeEnum.ID && (right = this.evaluateID(right));
+
+        if (left.type === NodeTypeEnum.Error) {
+          return left;
+        }
+        if (right.type === NodeTypeEnum.Error) {
+          return right;
+        }
+
+        if (left.type !== right.type) {
+          return this.newNode(NodeTypeEnum.Boolean, false);
+        }
+
+        return this.newNode(NodeTypeEnum.Boolean, left?.value === right?.value);
+      }
+      case NodeTypeEnum.NotEqual: {
+        var right = this.stack.pop();
+        var left = this.stack.pop();
+        left.type === NodeTypeEnum.ID && (left = this.evaluateID(left));
+        right.type === NodeTypeEnum.ID && (right = this.evaluateID(right));
+
+        if (left.type === NodeTypeEnum.Error) {
+          return left;
+        }
+        if (right.type === NodeTypeEnum.Error) {
+          return right;
+        }
+
+        if (left.type !== right.type) {
+          return this.newNode(NodeTypeEnum.Boolean, true);
+        }
+
+        return this.newNode(NodeTypeEnum.Boolean, left?.value !== right?.value);
+      }
+      case NodeTypeEnum.LessThan: {
+        var right = this.stack.pop();
+        var left = this.stack.pop();
+        left.type === NodeTypeEnum.ID && (left = this.evaluateID(left));
+        right.type === NodeTypeEnum.ID && (right = this.evaluateID(right));
+
+        if (left.type === NodeTypeEnum.Error) {
+          return left;
+        }
+        if (right.type === NodeTypeEnum.Error) {
+          return right;
+        }
+
+        if (left.type !== right.type) {
+          return this.newNode(NodeTypeEnum.Boolean, false);
+        }
+
+        return this.newNode(NodeTypeEnum.Boolean, left?.value < right?.value);
+      }
+      case NodeTypeEnum.GreaterThan: {
+        var right = this.stack.pop();
+        var left = this.stack.pop();
+        left.type === NodeTypeEnum.ID && (left = this.evaluateID(left));
+        right.type === NodeTypeEnum.ID && (right = this.evaluateID(right));
+
+        if (left.type === NodeTypeEnum.Error) {
+          return left;
+        }
+        if (right.type === NodeTypeEnum.Error) {
+          return right;
+        }
+
+        if (left.type !== right.type) {
+          return this.newNode(NodeTypeEnum.Boolean, false);
+        }
+
+        return this.newNode(NodeTypeEnum.Boolean, left?.value > right?.value);
+      }
+      case NodeTypeEnum.LessThanOrEqual: {
+        var right = this.stack.pop();
+        var left = this.stack.pop();
+        left.type === NodeTypeEnum.ID && (left = this.evaluateID(left));
+        right.type === NodeTypeEnum.ID && (right = this.evaluateID(right));
+
+        if (left.type === NodeTypeEnum.Error) {
+          return left;
+        }
+        if (right.type === NodeTypeEnum.Error) {
+          return right;
+        }
+
+        if (left.type !== right.type) {
+          return this.newNode(NodeTypeEnum.Boolean, false);
+        }
+
+        return this.newNode(NodeTypeEnum.Boolean, left?.value <= right?.value);
+      }
+      case NodeTypeEnum.GreaterThanOrEqual: {
+        var right = this.stack.pop();
+        var left = this.stack.pop();
+        left.type === NodeTypeEnum.ID && (left = this.evaluateID(left));
+        right.type === NodeTypeEnum.ID && (right = this.evaluateID(right));
+
+        if (left.type === NodeTypeEnum.Error) {
+          return left;
+        }
+        if (right.type === NodeTypeEnum.Error) {
+          return right;
+        }
+
+        if (left.type !== right.type) {
+          return this.newNode(NodeTypeEnum.Boolean, false);
+        }
+
+        return this.newNode(NodeTypeEnum.Boolean, left?.value >= right?.value);
       }
       default: {
         return this.newNode();

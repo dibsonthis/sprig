@@ -593,7 +593,7 @@ export class VM {
       const filePath = args[0];
       if (filePath.type !== NodeTypeEnum.String) {
         return this.newError(
-          "Function 'loadLib' expects argument 'filePath' to be a List"
+          "Function 'loadLib' expects argument 'filePath' to be a String"
         );
       }
 
@@ -2043,8 +2043,6 @@ export class VM {
       case NodeTypeEnum.Add: {
         var right = this.stack.pop();
         var left = this.stack.pop();
-        left.type === NodeTypeEnum.ID && (left = this.evaluateID(left));
-        right.type === NodeTypeEnum.ID && (right = this.evaluateID(right));
 
         if (left.type === NodeTypeEnum.Error) {
           return left;
@@ -2099,8 +2097,6 @@ export class VM {
       case NodeTypeEnum.Sub: {
         var right = this.stack.pop();
         var left = this.stack.pop();
-        left.type === NodeTypeEnum.ID && (left = this.evaluateID(left));
-        right.type === NodeTypeEnum.ID && (right = this.evaluateID(right));
 
         if (left.type === NodeTypeEnum.Error) {
           return left;
@@ -2120,8 +2116,6 @@ export class VM {
       case NodeTypeEnum.Mul: {
         var right = this.stack.pop();
         var left = this.stack.pop();
-        left.type === NodeTypeEnum.ID && (left = this.evaluateID(left));
-        right.type === NodeTypeEnum.ID && (right = this.evaluateID(right));
 
         if (left.type === NodeTypeEnum.Error) {
           return left;
@@ -2192,8 +2186,6 @@ export class VM {
       case NodeTypeEnum.Div: {
         var right = this.stack.pop();
         var left = this.stack.pop();
-        left.type === NodeTypeEnum.ID && (left = this.evaluateID(left));
-        right.type === NodeTypeEnum.ID && (right = this.evaluateID(right));
 
         if (left.type === NodeTypeEnum.Error) {
           return left;
@@ -2213,8 +2205,6 @@ export class VM {
       case NodeTypeEnum.Percent: {
         var right = this.stack.pop();
         var left = this.stack.pop();
-        left.type === NodeTypeEnum.ID && (left = this.evaluateID(left));
-        right.type === NodeTypeEnum.ID && (right = this.evaluateID(right));
 
         if (left.type === NodeTypeEnum.Error) {
           return left;
@@ -2234,8 +2224,6 @@ export class VM {
       case NodeTypeEnum.Caret: {
         var right = this.stack.pop();
         var left = this.stack.pop();
-        left.type === NodeTypeEnum.ID && (left = this.evaluateID(left));
-        right.type === NodeTypeEnum.ID && (right = this.evaluateID(right));
 
         if (left.type === NodeTypeEnum.Error) {
           return left;
@@ -2279,8 +2267,6 @@ export class VM {
       case NodeTypeEnum.TripleDot: {
         var right = this.stack.pop();
         var left = this.stack.pop();
-        left.type === NodeTypeEnum.ID && (left = this.evaluateID(left));
-        right.type === NodeTypeEnum.ID && (right = this.evaluateID(right));
 
         if (left.type === NodeTypeEnum.Error) {
           return left;
@@ -2302,8 +2288,6 @@ export class VM {
       case NodeTypeEnum.DoubleDot: {
         var right = this.stack.pop();
         var left = this.stack.pop();
-        left.type === NodeTypeEnum.ID && (left = this.evaluateID(left));
-        right.type === NodeTypeEnum.ID && (right = this.evaluateID(right));
 
         if (left.type === NodeTypeEnum.Error) {
           return left;
@@ -2326,8 +2310,6 @@ export class VM {
       case NodeTypeEnum.Pipe: {
         var right = this.stack.pop();
         var left = this.stack.pop();
-        left.type === NodeTypeEnum.ID && (left = this.evaluateID(left));
-        right.type === NodeTypeEnum.ID && (right = this.evaluateID(right));
 
         if (left.type === NodeTypeEnum.Error) {
           return left;
@@ -2359,8 +2341,6 @@ export class VM {
       case NodeTypeEnum.EqualEqual: {
         var right = this.stack.pop();
         var left = this.stack.pop();
-        left.type === NodeTypeEnum.ID && (left = this.evaluateID(left));
-        right.type === NodeTypeEnum.ID && (right = this.evaluateID(right));
 
         if (left.type === NodeTypeEnum.Error) {
           return left;
@@ -2378,8 +2358,6 @@ export class VM {
       case NodeTypeEnum.NotEqual: {
         var right = this.stack.pop();
         var left = this.stack.pop();
-        left.type === NodeTypeEnum.ID && (left = this.evaluateID(left));
-        right.type === NodeTypeEnum.ID && (right = this.evaluateID(right));
 
         if (left.type === NodeTypeEnum.Error) {
           return left;
@@ -2397,8 +2375,6 @@ export class VM {
       case NodeTypeEnum.LessThan: {
         var right = this.stack.pop();
         var left = this.stack.pop();
-        left.type === NodeTypeEnum.ID && (left = this.evaluateID(left));
-        right.type === NodeTypeEnum.ID && (right = this.evaluateID(right));
 
         if (left.type === NodeTypeEnum.Error) {
           return left;
@@ -2416,8 +2392,6 @@ export class VM {
       case NodeTypeEnum.GreaterThan: {
         var right = this.stack.pop();
         var left = this.stack.pop();
-        left.type === NodeTypeEnum.ID && (left = this.evaluateID(left));
-        right.type === NodeTypeEnum.ID && (right = this.evaluateID(right));
 
         if (left.type === NodeTypeEnum.Error) {
           return left;
@@ -2435,8 +2409,6 @@ export class VM {
       case NodeTypeEnum.LessThanOrEqual: {
         var right = this.stack.pop();
         var left = this.stack.pop();
-        left.type === NodeTypeEnum.ID && (left = this.evaluateID(left));
-        right.type === NodeTypeEnum.ID && (right = this.evaluateID(right));
 
         if (left.type === NodeTypeEnum.Error) {
           return left;
@@ -2454,8 +2426,6 @@ export class VM {
       case NodeTypeEnum.GreaterThanOrEqual: {
         var right = this.stack.pop();
         var left = this.stack.pop();
-        left.type === NodeTypeEnum.ID && (left = this.evaluateID(left));
-        right.type === NodeTypeEnum.ID && (right = this.evaluateID(right));
 
         if (left.type === NodeTypeEnum.Error) {
           return left;

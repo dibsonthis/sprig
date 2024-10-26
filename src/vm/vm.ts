@@ -1444,17 +1444,12 @@ export class VM {
     }
 
     if (fn.funcNode.coroutineIndex !== undefined) {
-      // vm.symbols = fn.funcNode.closures;
       for (const key in fn.funcNode.closures) {
         vm.symbols[key] = fn.funcNode.closures[key];
       }
       for (const symbol in fn.funcNode.coroutineSymbols) {
         vm.symbols[symbol] = fn.funcNode.coroutineSymbols[symbol];
       }
-      // vm.symbols = {
-      //   ...fn.funcNode.closures,
-      //   ...fn.funcNode.coroutineSymbols,
-      // };
 
       vm.index = fn.funcNode.coroutineIndex;
       vm.node = vm.nodes[vm.index];
@@ -1541,13 +1536,6 @@ export class VM {
       fn.funcNode.coroutineIndex = vm.index + 1;
       fn.funcNode.coroutineSymbols = vm.symbols;
     }
-    // else {
-    //   Object.keys(fn.funcNode.closures).forEach((key) => {
-    //     if (!fn.meta.capturedIds.includes(key)) {
-    //       delete fn.funcNode.closures[key];
-    //     }
-    //   });
-    // }
 
     return res;
   }
@@ -1650,20 +1638,8 @@ export class VM {
       const symbol = this.findSymbol(id);
       if (symbol) {
         fn.funcNode.closures[id] = symbol;
-        // fn.funcNode.closures[id] = {
-        //   ...symbol,
-        //   node: symbol.node,
-        //   const: false,
-        //   isClosure: true,
-        // };
       }
     });
-
-    // TODO: optimise this, coz we're bringing EVERYTHING in
-
-    // for (const symbol in this.symbols) {
-    //   fn.funcNode.closures[symbol] = this.symbols[symbol];
-    // }
 
     return fn;
   }

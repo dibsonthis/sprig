@@ -493,25 +493,3 @@ const test_core = () => {
 const tests = getLocalTests()
 
 Test.run(...tests)
-
-const f = () => 10
-
-const time = exec(`() => performance.now()`)
-
-let res = 0
-
-const arr = 0..2000
-
-const startTime = time()
-
-for (arr, x) {
-    for (arr, y) {
-        10 * 2
-    }
-}
-
-const endTime = time()
-
-print(res)
-
-print(`Duration: {{((endTime - startTime) / 1000)->truncate(3)}} s`)

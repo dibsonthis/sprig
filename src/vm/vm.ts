@@ -273,7 +273,9 @@ export class VM {
         return repr;
       }
       default: {
-        return "undefined";
+        return `${NodeTypeEnum[node.type]} ${
+          typeof node.value === "number" ? node.value : ""
+        }`;
       }
     }
   }
@@ -668,6 +670,35 @@ export class VM {
         code = exitCode.value;
       }
       process.exit(code);
+    },
+    dis: (args: Node[]) => {
+      if (args.length !== 1) {
+        return this.newError("Function 'dis' expects 1 argument");
+      }
+      let fn = args[0];
+      if (fn.type !== NodeTypeEnum.Function) {
+        return this.newError(
+          "Function 'dis' expects argument 'fn' to be a Function"
+        );
+      }
+
+      let startLine = 0;
+      const dis = fn.value
+        ?.map((node, i) => {
+          if (i == 0) {
+            startLine = node.line;
+          }
+          const nodeType = NodeTypeEnum[node.type];
+          const nodeValue = this.toString(node);
+          const currLine = node.line - startLine + 1;
+
+          return `${i}\t[${currLine}]\t${this.toString(node)} ${
+            !nodeValue.startsWith(nodeType) ? `(${nodeType})` : ""
+          } `;
+        })
+        .join("\n");
+
+      console.log(`---\n${fn.funcNode.name}:\n\n${dis}\n---`);
     },
     inspect: (args: Node[]) => {
       if (args.length !== 1) {

@@ -498,7 +498,7 @@ const time = exec(`() => performance.now()`)
 
 let res = 0
 
-const arr = 0..100
+const arr = 0..5000
 
 const startTime = time()
 
@@ -512,14 +512,6 @@ const endTime = time()
 
 print(res)
 
-print(`Duration: {{((endTime - startTime) / 1000)->truncate(3)}} s`)
+print((endTime - startTime) / 1000)
 
-const fn = () => {
-    for (arr, x) {
-        for (arr, y) {
-            res += x + y
-        }
-    }
-}
-
-dis(fn)
+// print(`Duration: {{((endTime - startTime) / 1000)->truncate(3)}} s`)

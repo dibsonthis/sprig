@@ -7,7 +7,7 @@ import fs from "fs";
 import { NodeTypeEnum } from "./types";
 import { injectCommonAndModules } from "./utils/utils";
 
-const debug = false;
+const debug = true;
 
 const filePath = debug ? "testing/tests.sp" : process.argv[2];
 

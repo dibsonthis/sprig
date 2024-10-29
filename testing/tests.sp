@@ -528,13 +528,13 @@ const time = exec(`() => performance.now()`)
 
 var res = 0
 
-const arr = 1..10000
+const arr = 1..5000
 
 const startTime = time()
 
 for (arr, x) {
     for (arr, y) {
-        x + y
+        res
     }
 }
 

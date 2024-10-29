@@ -158,6 +158,8 @@ export enum NodeTypeEnum {
   FunctionCallBegin,
   SwapStack,
   CatchAllParam,
+  LoadTemp,
+  Load,
 }
 
 export const NodeTypes = [
@@ -230,6 +232,8 @@ type DeclNode = {
   id?: Node;
   value?: Node;
   isClass?: boolean;
+  variableIndex?: number;
+  variableIndices?: number[];
 };
 
 export type FuncNode = {
@@ -261,6 +265,8 @@ export type ForLoopStartNode = {
   arr?: Node[];
   valueName?: string;
   indexName?: string;
+  valueIndex?: number;
+  indexIndex?: number;
 };
 
 export type Node = {
@@ -281,6 +287,7 @@ export type Node = {
   schema?: Node;
   handler?: Node;
   class?: Node;
+  index?: number;
   meta?: {
     readonly?: boolean;
     stringType?: "double" | "single" | "special";

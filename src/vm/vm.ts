@@ -12,6 +12,20 @@ export class VM {
   private index: number = 0;
 
   public symbols: SymbolTable = {};
+  public symbolsArray: {
+    node: Node;
+    const: boolean;
+    canChange?: boolean;
+    isGlobal?: boolean;
+    isClosure?: boolean;
+  }[] = [];
+  tempVarsArray: {
+    node: Node;
+    const: boolean;
+    canChange?: boolean;
+    isGlobal?: boolean;
+    isClosure?: boolean;
+  }[] = [];
   public tempVars: SymbolTable = {};
   public operators: Record<string, Node> = {};
   public cachedImports = {};
@@ -1141,26 +1155,44 @@ export class VM {
   }
 
   private evaluateID(node: Node) {
-    let symbol;
-    if (this.tempVars.hasOwnProperty(node.value)) {
-      symbol = this.tempVars[node.value];
-    } else {
-      symbol = this.symbols[node.value];
+    // Symbol Array - experimental
+    const _symbol = this.symbolsArray[node.index];
+    if (_symbol) {
+      return _symbol.node;
     }
 
-    if (!symbol) {
-      if (this.builtins.hasOwnProperty(node.value)) {
-        const native = this.newNode(NodeTypeEnum.Native);
-        native.nativeNode = {
-          name: node.value,
-          function: this.builtins[node.value],
-          builtin: true,
-        };
-        return native;
-      }
-      return this.newError(`Variable '${node.value}' is not defined`);
+    if (this.builtins.hasOwnProperty(node.value)) {
+      const native = this.newNode(NodeTypeEnum.Native);
+      native.nativeNode = {
+        name: node.value,
+        function: this.builtins[node.value],
+        builtin: true,
+      };
+      return native;
     }
-    return symbol.node;
+
+    // --- //
+
+    // let symbol;
+    // if (this.tempVars.hasOwnProperty(node.value)) {
+    //   symbol = this.tempVars[node.value];
+    // } else {
+    //   symbol = this.symbols[node.value];
+    // }
+
+    // if (!symbol) {
+    //   if (this.builtins.hasOwnProperty(node.value)) {
+    //     const native = this.newNode(NodeTypeEnum.Native);
+    //     native.nativeNode = {
+    //       name: node.value,
+    //       function: this.builtins[node.value],
+    //       builtin: true,
+    //     };
+    //     return native;
+    //   }
+    //   return this.newError(`Variable '${node.value}' is not defined`);
+    // }
+    // return symbol.node;
   }
 
   private resetLoops() {
@@ -1266,9 +1298,11 @@ export class VM {
 
       if (node.forLoopStartNode.valueName) {
         delete this.tempVars[node.forLoopStartNode.valueName];
+        this.tempVarsArray.pop();
       }
       if (node.forLoopStartNode.indexName) {
         delete this.tempVars[node.forLoopStartNode.indexName];
+        this.tempVarsArray.pop();
       }
       return;
     }
@@ -1278,9 +1312,17 @@ export class VM {
         node: node.forLoopStartNode.arr[node.forLoopStartNode.count],
         const: false,
       };
+      this.tempVarsArray[node.forLoopStartNode.valueIndex] = {
+        node: node.forLoopStartNode.arr[node.forLoopStartNode.count],
+        const: false,
+      };
     }
     if (node.forLoopStartNode.indexName) {
       this.tempVars[node.forLoopStartNode.indexName] = {
+        node: this.newNode(NodeTypeEnum.Number, node.forLoopStartNode.count),
+        const: false,
+      };
+      this.tempVarsArray[node.forLoopStartNode.indexIndex] = {
         node: this.newNode(NodeTypeEnum.Number, node.forLoopStartNode.count),
         const: false,
       };
@@ -1302,6 +1344,9 @@ export class VM {
         id.nodes.forEach((elem, i) => {
           if (i < id.nodes.length - 1) {
             const declNode = this.newNode(NodeTypeEnum.Decl, node.value);
+            declNode.declNode = {
+              variableIndex: node.declNode.variableIndices[i],
+            };
             this.stack.push(this.newNode(NodeTypeEnum.ID, elem.value));
             this.stack.push(valueNodes.shift() ?? this.newNode());
             this.evaluateDecl(declNode);
@@ -1310,6 +1355,9 @@ export class VM {
 
         if (valueNodes.length > 1) {
           const declNode = this.newNode(NodeTypeEnum.Decl, node.value);
+          declNode.declNode = {
+            variableIndex: node.declNode.variableIndices.at(-1),
+          };
           this.stack.push(
             this.newNode(NodeTypeEnum.ID, id.nodes.at(-1)?.value)
           );
@@ -1320,6 +1368,9 @@ export class VM {
           this.evaluateDecl(declNode);
         } else {
           const declNode = this.newNode(NodeTypeEnum.Decl, node.value);
+          declNode.declNode = {
+            variableIndex: node.declNode.variableIndices.at(-1),
+          };
           this.stack.push(
             this.newNode(NodeTypeEnum.ID, id.nodes.at(-1)?.value)
           );
@@ -1329,6 +1380,9 @@ export class VM {
       } else if (value.type === NodeTypeEnum.Object) {
         id.nodes.forEach((elem, i) => {
           const declNode = this.newNode(NodeTypeEnum.Decl, node.value);
+          declNode.declNode = {
+            variableIndex: node.declNode.variableIndices[i],
+          };
           this.stack.push(this.newNode(NodeTypeEnum.ID, elem.value));
           this.stack.push(value.value[elem.value] ?? this.newNode());
           this.evaluateDecl(declNode);
@@ -1338,22 +1392,12 @@ export class VM {
       return this.newNode();
     }
 
-    const existingSymbol = this.symbols[id.value];
+    // Symbol array - experimental
 
-    if (existingSymbol && this.symbols.hasOwnProperty(id.value)) {
-      if (
-        !(existingSymbol.canChange && node.value === "let") &&
-        !this.capturedIds.includes(id.value)
-      ) {
-        return this.newError(`Variable '${id.value}' is already defined`);
-      }
-    }
-
-    if (value.type === NodeTypeEnum.ID) {
-      value = this.evaluateID(value);
-      if (value.type === NodeTypeEnum.Error) {
-        return value;
-      }
+    const _existingSymbol = this.symbolsArray[node.declNode.variableIndex];
+    // todo: move this compile time
+    if (_existingSymbol && node.value !== "let") {
+      return this.newError(`Variable '${id.value}' is already defined`);
     }
 
     if (value.type === NodeTypeEnum.Function && !value.funcNode?.name) {
@@ -1364,12 +1408,48 @@ export class VM {
       value.class = id;
     }
 
-    this.symbols[id.value] = {
+    this.symbolsArray[node.declNode.variableIndex] = {
       node: value,
       const: node.value === "const",
       canChange: node.value === "let",
     };
+
     return value;
+
+    // --- //
+
+    // const existingSymbol = this.symbols[id.value];
+
+    // if (existingSymbol && this.symbols.hasOwnProperty(id.value)) {
+    //   if (
+    //     !(existingSymbol.canChange && node.value === "let") &&
+    //     !this.capturedIds.includes(id.value)
+    //   ) {
+    //     return this.newError(`Variable '${id.value}' is already defined`);
+    //   }
+    // }
+
+    // if (value.type === NodeTypeEnum.ID) {
+    //   value = this.evaluateID(value);
+    //   if (value.type === NodeTypeEnum.Error) {
+    //     return value;
+    //   }
+    // }
+
+    // if (value.type === NodeTypeEnum.Function && !value.funcNode?.name) {
+    //   value.funcNode.name = id.value;
+    // }
+
+    // if (node?.declNode?.isClass) {
+    //   value.class = id;
+    // }
+
+    // this.symbols[id.value] = {
+    //   node: value,
+    //   const: node.value === "const",
+    //   canChange: node.value === "let",
+    // };
+    // return value;
   }
 
   private evaluateFunctionCall(node: Node, isMethod = false) {
@@ -1418,7 +1498,9 @@ export class VM {
       return this.builtins[fnName](args);
     }
 
-    fnName && (fn = this.tempVars[fnName]?.node ?? this.symbols[fnName]?.node);
+    // fnName && (fn = this.tempVars[fnName]?.node ?? this.symbols[fnName]?.node);
+
+    fn = this.symbolsArray[fn.index].node;
 
     if (!fn) {
       this.errorAndContinue(`Function '${fnName}' is undefined`);
@@ -2274,24 +2356,27 @@ export class VM {
       case NodeTypeEnum.Equal: {
         var right = this.stack.pop();
         var left = this.stack.pop();
-        right.type === NodeTypeEnum.ID && (right = this.evaluateID(right));
 
         if (right.type === NodeTypeEnum.Error) {
           return right;
         }
 
         if (left.type === NodeTypeEnum.String) {
-          const symbol = this.symbols[left.value];
-          if (!symbol) {
-            return this.newError(`Variable '${left.value}' is undefined`);
-          }
-          if (symbol.const) {
-            return this.newError(
-              `Cannot reassign value of const variable '${left.value}'`
-            );
-          }
-          this.symbols[left.value].node = right;
+          // Symbol array - experimental
+          this.symbolsArray[left.index].node = right;
           return right;
+          // -- //
+          // const symbol = this.symbols[left.value];
+          // if (!symbol) {
+          //   return this.newError(`Variable '${left.value}' is undefined`);
+          // }
+          // if (symbol.const) {
+          //   return this.newError(
+          //     `Cannot reassign value of const variable '${left.value}'`
+          //   );
+          // }
+          // this.symbols[left.value].node = right;
+          // return right;
         }
         return this.newNode();
       }
@@ -2470,6 +2555,10 @@ export class VM {
         }
 
         return this.newNode(NodeTypeEnum.Boolean, left?.value >= right?.value);
+      }
+      case NodeTypeEnum.LoadTemp: {
+        const index = node.value;
+        return this.tempVarsArray[index].node;
       }
       default: {
         return this.newNode();

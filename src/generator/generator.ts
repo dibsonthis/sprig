@@ -13,8 +13,9 @@ export class Generator {
   public filePath: string;
 
   public capturedIds = [];
-
   public isCoroutine = false;
+  public variables: { id: string; type: string }[] = [];
+  public tempVariables: { id: string; type: string }[] = [];
 
   private errorAndExit(message: string, node?: Node) {
     const errorNode = node ? node : this.node;
@@ -127,6 +128,31 @@ export class Generator {
         if (captureIds) {
           this.capturedIds.push(node.value);
         }
+        const variableIndex = this.variables.findIndex(
+          (e) => e.id === node.value
+        );
+        if (variableIndex === -1) {
+          // Check temp vars
+          const tempVariableIndex = this.tempVariables.findIndex(
+            (e) => e.id === node.value
+          );
+          if (tempVariableIndex != -1) {
+            this.generatedNodes.push(
+              this.newNode(NodeTypeEnum.LoadTemp, tempVariableIndex)
+            );
+          } else {
+            this.errorAndExit(`Variable '${node.value}' is undefined`);
+          }
+        } else {
+          this.generatedNodes.push({
+            ...node,
+            index: variableIndex,
+          });
+        }
+        if (pop) {
+          this.generatedNodes.push(this.newNode(NodeTypeEnum.Pop));
+        }
+        return;
       }
       case NodeTypeEnum.String:
       case NodeTypeEnum.Number:
@@ -146,8 +172,24 @@ export class Generator {
           if (captureIds) {
             this.capturedIds.push(node.left.value);
           }
+          const idStringNode = this.newNode(
+            NodeTypeEnum.String,
+            node.left.value
+          );
+          idStringNode.index = this.variables.findIndex(
+            (e) => e.id === node.left.value
+          );
+          if (idStringNode.index === -1) {
+            this.errorAndExit(`Variable '${node.left.value}' is undefined`);
+          }
+          if (this.variables[idStringNode.index].type === "const") {
+            this.errorAndExit(
+              `Const variable '${node.left.value}' cannot be re-assigned`
+            );
+          }
           this.generatedNodes.push(
-            this.newNode(NodeTypeEnum.String, node.left.value)
+            // this.newNode(NodeTypeEnum.String, node.left.value)
+            idStringNode
           );
           this.generateBytecode(node.right, false, captureIds);
           this.generatedNodes.push(this.newNode(NodeTypeEnum.Equal));
@@ -521,12 +563,29 @@ export class Generator {
         return;
       }
       case NodeTypeEnum.Decl: {
+        const variableIndices = [];
         let isClass = false;
         if (node.declNode.id.type === NodeTypeEnum.Paren) {
           isClass = true;
           node.declNode.id = node.declNode.id.node;
         }
         if (node.declNode.id.type === NodeTypeEnum.ID) {
+          // Check if variable already defined
+          const symbol = this.variables.find(
+            (e) => e.id === node.declNode.id.value
+          );
+          if (symbol) {
+            if (!(node.value === "let" && symbol.type === "let")) {
+              this.errorAndExit(
+                `Variable '${node.declNode.id.value}' cannot be re-declared`
+              );
+            }
+          } else {
+            this.variables.push({
+              id: node.declNode.id.value,
+              type: node.value,
+            });
+          }
           this.generatedNodes.push(
             this.newNode(NodeTypeEnum.String, node.declNode.id.value)
           );
@@ -542,6 +601,18 @@ export class Generator {
                 "Destructured declarations need to be identifiers"
               );
             }
+            // Check if variable already defined
+            const symbol = this.variables.find((e) => e.id === elem.value);
+            if (symbol) {
+              if (!(node.value === "let" && symbol.type === "let")) {
+                this.errorAndExit(
+                  `Variable '${elem.value}' cannot be re-declared`
+                );
+              }
+            } else {
+              this.variables.push({ id: elem.value, type: node.value });
+            }
+            variableIndices.push(this.variables.length - 1);
             return this.newNode(NodeTypeEnum.String, elem.value);
           });
           this.generateBytecode(destructuredList, false, false);
@@ -563,6 +634,18 @@ export class Generator {
                 "Destructured declarations need to be identifiers"
               );
             }
+            // Check if variable already defined
+            const symbol = this.variables.find((e) => e.id === elem.value);
+            if (symbol) {
+              if (!(node.value === "let" && symbol.type === "let")) {
+                this.errorAndExit(
+                  `Variable '${elem.value}' cannot be re-declared`
+                );
+              }
+            } else {
+              this.variables.push({ id: elem.value, type: node.value });
+            }
+            variableIndices.push(this.variables.length - 1);
             return this.newNode(NodeTypeEnum.String, elem.value);
           });
           this.generateBytecode(destructuredList, false, captureIds);
@@ -571,7 +654,11 @@ export class Generator {
         this.generateBytecode(node.declNode.value, false, captureIds);
         this.generatedNodes.push({
           ...node,
-          declNode: { isClass },
+          declNode: {
+            isClass,
+            variableIndex: this.variables.length - 1,
+            variableIndices,
+          },
         });
         if (pop) {
           this.generatedNodes.push(this.newNode(NodeTypeEnum.Pop));
@@ -614,9 +701,15 @@ export class Generator {
             if (captureIds) {
               this.capturedIds.push(node.left.value);
             }
-            this.generatedNodes.push(
-              this.newNode(NodeTypeEnum.String, node.left.value)
+            const fnIdString = this.newNode(
+              NodeTypeEnum.String,
+              node.left.value
             );
+            fnIdString.index = this.variables.findIndex(
+              (e) => e.id === node.left.value
+            );
+            // todo: change these to Load bytecode
+            this.generatedNodes.push(fnIdString);
           } else {
             this.generateBytecode(node.left, false, captureIds);
           }
@@ -633,6 +726,7 @@ export class Generator {
         return node;
       }
       case NodeTypeEnum.ForStatement: {
+        const tempVarIndices = [];
         const loopStart = this.newNode(NodeTypeEnum.StartForLoop);
         loopStart.value = 0;
         loopStart.forLoopStartNode = {
@@ -650,14 +744,20 @@ export class Generator {
           if (valueName.type !== NodeTypeEnum.ID) {
             this.errorAndExit("For loop variable name must be of type ID");
           }
+          tempVarIndices.push(tempVarIndices.length);
+          this.tempVariables.push({ id: valueName.value, type: "let" });
           loopStart.forLoopStartNode.valueName = valueName.value;
+          loopStart.forLoopStartNode.valueIndex = this.tempVariables.length - 1;
         }
         if (forLoopSections.length > 2) {
           const indexName = forLoopSections[2];
           if (indexName.type !== NodeTypeEnum.ID) {
             this.errorAndExit("For loop index name must be of type ID");
           }
+          tempVarIndices.push(tempVarIndices.length);
+          this.tempVariables.push({ id: indexName.value, type: "let" });
           loopStart.forLoopStartNode.indexName = indexName.value;
+          loopStart.forLoopStartNode.indexIndex = this.tempVariables.length - 1;
         }
         this.generateBytecode(forLoopSections[0], false, captureIds);
         this.generatedNodes.push(loopStart);
@@ -670,6 +770,10 @@ export class Generator {
           value: loopStartIndex,
         });
         loopStart.forLoopStartNode.endIndex = this.generatedNodes.length - 1;
+        this.tempVariables = this.tempVariables.slice(
+          0,
+          -tempVarIndices.length
+        );
         return;
       }
       case NodeTypeEnum.WhileStatement: {

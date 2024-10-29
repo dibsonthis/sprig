@@ -669,7 +669,8 @@ export class Parser {
         if (
           ((this.node.type === NodeTypeEnum.ID &&
             this.node.value !== "const" &&
-            this.node.value !== "var") ||
+            this.node.value !== "var" &&
+            this.node.value !== "let") ||
             this.node.type === NodeTypeEnum.Break ||
             this.node.type === NodeTypeEnum.FunctionCall ||
             this.node.type === NodeTypeEnum.Accessor ||

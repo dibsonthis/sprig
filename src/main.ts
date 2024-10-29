@@ -37,54 +37,54 @@ const commonPath = debug
 
 const modulesPath = path.join(__dirname, "modules");
 
-injectCommonAndModules(vm, commonPath, modulesPath);
+// injectCommonAndModules(vm, commonPath, modulesPath);
 
 process.chdir(path.dirname(filePath));
 
-// Config
-try {
-  const config = fs.readFileSync("./config.sp");
-  const configLexer = new Lexer(config.toString(), true);
-  configLexer.tokenize();
+// // Config
+// try {
+//   const config = fs.readFileSync("./config.sp");
+//   const configLexer = new Lexer(config.toString(), true);
+//   configLexer.tokenize();
 
-  const configParser = new Parser(configLexer.nodes, configLexer.filePath);
-  configParser.parse();
+//   const configParser = new Parser(configLexer.nodes, configLexer.filePath);
+//   configParser.parse();
 
-  const configGenerator = new Generator(
-    configParser.nodes,
-    configParser.filePath
-  );
-  configGenerator.generate();
+//   const configGenerator = new Generator(
+//     configParser.nodes,
+//     configParser.filePath
+//   );
+//   configGenerator.generate();
 
-  const configVM = new VM(
-    configGenerator.generatedNodes,
-    configParser.filePath
-  );
-  configVM.evaluate();
-  for (const key of Object.keys(configVM.symbols.globals?.node?.value ?? {})) {
-    vm.symbols[key] = {
-      node: configVM.symbols.globals.node.value[key],
-      const: true,
-      isGlobal: true,
-    };
-  }
-  for (const key of Object.keys(
-    configVM.symbols.operators?.node?.value ?? {}
-  )) {
-    const operation = configVM.symbols.operators.node.value[key];
-    if (operation.funcNode.params?.length == 1) {
-      vm.operators[`unary${key}`] = operation;
-    } else {
-      vm.operators[key] = operation;
-    }
-  }
+//   const configVM = new VM(
+//     configGenerator.generatedNodes,
+//     configParser.filePath
+//   );
+//   configVM.evaluate();
+//   for (const key of Object.keys(configVM.symbols.globals?.node?.value ?? {})) {
+//     vm.symbols[key] = {
+//       node: configVM.symbols.globals.node.value[key],
+//       const: true,
+//       isGlobal: true,
+//     };
+//   }
+//   for (const key of Object.keys(
+//     configVM.symbols.operators?.node?.value ?? {}
+//   )) {
+//     const operation = configVM.symbols.operators.node.value[key];
+//     if (operation.funcNode.params?.length == 1) {
+//       vm.operators[`unary${key}`] = operation;
+//     } else {
+//       vm.operators[key] = operation;
+//     }
+//   }
 
-  const moduleObject = configParser.newNode(NodeTypeEnum.Object, {});
-  moduleObject.evaluated = true;
-  Object.keys(configVM.symbols).forEach((key) => {
-    moduleObject.value[key] = configVM.symbols[key].node;
-  });
-  vm.symbols.__config = { node: moduleObject, const: false, isGlobal: true };
-} catch (e) {}
+//   const moduleObject = configParser.newNode(NodeTypeEnum.Object, {});
+//   moduleObject.evaluated = true;
+//   Object.keys(configVM.symbols).forEach((key) => {
+//     moduleObject.value[key] = configVM.symbols[key].node;
+//   });
+//   vm.symbols.__config = { node: moduleObject, const: false, isGlobal: true };
+// } catch (e) {}
 
 vm.evaluate();

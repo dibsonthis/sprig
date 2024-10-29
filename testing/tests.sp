@@ -494,32 +494,54 @@
 
 // Test.run(...tests)
 
+// const time = exec(`() => performance.now()`)
+
+// let res = 0
+
+// const arr = 0..100
+
+// const startTime = time()
+
+// for (arr, x) {
+//     for (arr, y) {
+//         res += x + y
+//     }
+// }
+
+// const endTime = time()
+
+// print(res)
+
+// print(`Duration: {{((endTime - startTime) / 1000)->truncate(3)}} s`)
+
+// const fn = () => {
+//     for (arr, x) {
+//         for (arr, y) {
+//             res += x + y
+//         }
+//     }
+// }
+
+// dis(fn)
+
 const time = exec(`() => performance.now()`)
 
-let res = 0
+var res = 0
 
-const arr = 0..100
+const arr = 1..10000
 
 const startTime = time()
 
 for (arr, x) {
     for (arr, y) {
-        res += x + y
+        x + y
     }
 }
 
 const endTime = time()
 
+print((endTime - startTime) / 1000)
+
+// print(`Duration: {{((endTime - startTime) / 1000)->truncate(3)}} s`)
+
 print(res)
-
-print(`Duration: {{((endTime - startTime) / 1000)->truncate(3)}} s`)
-
-const fn = () => {
-    for (arr, x) {
-        for (arr, y) {
-            res += x + y
-        }
-    }
-}
-
-dis(fn)

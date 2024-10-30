@@ -160,6 +160,7 @@ export enum NodeTypeEnum {
   CatchAllParam,
   LoadTemp,
   Load,
+  LoadSymbol,
 }
 
 export const NodeTypes = [
@@ -246,6 +247,7 @@ export type FuncNode = {
   isCoroutine?: boolean;
   coroutineIndex?: number;
   coroutineSymbols?: SymbolTable;
+  variableMap?: Record<string, number>;
   meta?: {};
 };
 

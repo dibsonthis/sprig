@@ -29,6 +29,9 @@ const generator = new Generator(parser.nodes, parser.filePath);
 generator.generate();
 
 const vm = new VM(generator.generatedNodes, parser.filePath);
+vm.variables = generator.variables;
+vm.tempVariables = generator.tempVariables;
+vm.variableMap = generator.variableMap;
 vm.functionName = "main";
 
 const commonPath = debug

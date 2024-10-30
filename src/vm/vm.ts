@@ -27,6 +27,11 @@ export class VM {
     isClosure?: boolean;
   }[] = [];
   public tempVars: SymbolTable = {};
+
+  public variables: { id: string; type: string }[] = [];
+  public tempVariables: { id: string; type: string }[] = [];
+  public variableMap: Record<string, number> = {};
+
   public operators: Record<string, Node> = {};
   public cachedImports = {};
   public filePath: string;
@@ -417,6 +422,8 @@ export class VM {
     const parser = new Parser(lexer.nodes, "eval");
     parser.parse();
     const generator = new Generator(parser.nodes, parser.filePath);
+    generator.variables = this.variables;
+    generator.tempVariables = this.tempVariables;
     generator.generate(true);
 
     if (generator.generatedNodes.at(-1)?.type === NodeTypeEnum.Pop) {
@@ -426,8 +433,14 @@ export class VM {
     const vm = new VM(generator.generatedNodes, parser.filePath);
     vm.capturedIds = generator.capturedIds;
     this.capturedIds = [...this.capturedIds, ...vm.capturedIds];
+    // generator.capturedIds.forEach((id) => {
+    //   const symbol = this.findSymbol(id);
+    //   if (symbol) {
+    //     this.symbols[id] = symbol;
+    //   }
+    // });
     generator.capturedIds.forEach((id) => {
-      const symbol = this.findSymbol(id);
+      const symbol = this.findSymbol_(id);
       if (symbol) {
         this.symbols[id] = symbol;
       }
@@ -455,6 +468,7 @@ export class VM {
       vm.symbols = this.symbols;
       vm.tempVars = this.tempVars;
       vm.operators = this.operators;
+      vm.symbolsArray = this.symbolsArray;
     }
 
     return vm.evaluate();
@@ -1157,19 +1171,20 @@ export class VM {
   private evaluateID(node: Node) {
     // Symbol Array - experimental
     const _symbol = this.symbolsArray[node.index];
-    if (_symbol) {
-      return _symbol.node;
-    }
+    return _symbol.node;
+    // if (_symbol) {
+    //   return _symbol.node;
+    // }
 
-    if (this.builtins.hasOwnProperty(node.value)) {
-      const native = this.newNode(NodeTypeEnum.Native);
-      native.nativeNode = {
-        name: node.value,
-        function: this.builtins[node.value],
-        builtin: true,
-      };
-      return native;
-    }
+    // if (this.builtins.hasOwnProperty(node.value)) {
+    //   const native = this.newNode(NodeTypeEnum.Native);
+    //   native.nativeNode = {
+    //     name: node.value,
+    //     function: this.builtins[node.value],
+    //     builtin: true,
+    //   };
+    //   return native;
+    // }
 
     // --- //
 
@@ -1297,31 +1312,21 @@ export class VM {
       this.node = this.nodes[this.index];
 
       if (node.forLoopStartNode.valueName) {
-        delete this.tempVars[node.forLoopStartNode.valueName];
         this.tempVarsArray.pop();
       }
       if (node.forLoopStartNode.indexName) {
-        delete this.tempVars[node.forLoopStartNode.indexName];
         this.tempVarsArray.pop();
       }
       return;
     }
 
     if (node.forLoopStartNode.valueName) {
-      this.tempVars[node.forLoopStartNode.valueName] = {
-        node: node.forLoopStartNode.arr[node.forLoopStartNode.count],
-        const: false,
-      };
       this.tempVarsArray[node.forLoopStartNode.valueIndex] = {
         node: node.forLoopStartNode.arr[node.forLoopStartNode.count],
         const: false,
       };
     }
     if (node.forLoopStartNode.indexName) {
-      this.tempVars[node.forLoopStartNode.indexName] = {
-        node: this.newNode(NodeTypeEnum.Number, node.forLoopStartNode.count),
-        const: false,
-      };
       this.tempVarsArray[node.forLoopStartNode.indexIndex] = {
         node: this.newNode(NodeTypeEnum.Number, node.forLoopStartNode.count),
         const: false,
@@ -1500,7 +1505,7 @@ export class VM {
 
     // fnName && (fn = this.tempVars[fnName]?.node ?? this.symbols[fnName]?.node);
 
-    fn = this.symbolsArray[fn.index].node;
+    fn = this.symbolsArray[fn.index]?.node ?? this.symbols[fnName]?.node;
 
     if (!fn) {
       this.errorAndContinue(`Function '${fnName}' is undefined`);
@@ -1519,6 +1524,7 @@ export class VM {
     }
 
     const vm = new VM(fn.value, fn.funcNode.originFilePath);
+    vm.variableMap = fn.funcNode?.variableMap;
     vm.capturedIds = fn.meta.capturedIds;
     vm.operators = this.operators;
     vm.parentVM = this;
@@ -1716,6 +1722,19 @@ export class VM {
     return undefined;
   }
 
+  public findSymbol_(id: string) {
+    let vm = this;
+    while (vm) {
+      if (vm.variableMap.hasOwnProperty(id)) {
+        const index = vm.variableMap[id];
+        return vm.symbolsArray[index];
+      }
+      vm = vm.parentVM as any;
+    }
+
+    return undefined;
+  }
+
   private evaluateFunction(node: Node) {
     if (node.evaluated) {
       return node;
@@ -1729,6 +1748,7 @@ export class VM {
       closures: {},
       isCoroutine: node.funcNode?.isCoroutine,
       originFilePath: node.funcNode?.originFilePath,
+      variableMap: node.funcNode?.variableMap,
     };
     fn.meta = node.meta;
     fn.class = node.class;
@@ -1748,10 +1768,14 @@ export class VM {
     }
 
     fn.meta?.capturedIds?.forEach((id) => {
-      const symbol = this.findSymbol(id);
+      const symbol = this.findSymbol_(id);
       if (symbol) {
         fn.funcNode.closures[id] = symbol;
       }
+      // const symbol = this.findSymbol(id);
+      // if (symbol) {
+      //   fn.funcNode.closures[id] = symbol;
+      // }
     });
 
     return fn;
@@ -2361,23 +2385,16 @@ export class VM {
           return right;
         }
 
-        if (left.type === NodeTypeEnum.String) {
-          // Symbol array - experimental
+        if (left.index >= 0) {
           this.symbolsArray[left.index].node = right;
           return right;
-          // -- //
-          // const symbol = this.symbols[left.value];
-          // if (!symbol) {
-          //   return this.newError(`Variable '${left.value}' is undefined`);
-          // }
-          // if (symbol.const) {
-          //   return this.newError(
-          //     `Cannot reassign value of const variable '${left.value}'`
-          //   );
-          // }
-          // this.symbols[left.value].node = right;
-          // return right;
         }
+
+        if (this.symbols.hasOwnProperty(left.value)) {
+          this.symbols[left.value].node = right;
+          return right;
+        }
+
         return this.newNode();
       }
       case NodeTypeEnum.TripleDot: {
@@ -2559,6 +2576,22 @@ export class VM {
       case NodeTypeEnum.LoadTemp: {
         const index = node.value;
         return this.tempVarsArray[index].node;
+      }
+      case NodeTypeEnum.LoadSymbol: {
+        const name = node.value;
+        if (this.symbols.hasOwnProperty(name)) {
+          return this.symbols[name].node;
+        }
+        if (this.builtins.hasOwnProperty(name)) {
+          const native = this.newNode(NodeTypeEnum.Native);
+          native.nativeNode = {
+            name,
+            function: this.builtins[name],
+            builtin: true,
+          };
+          return native;
+        }
+        return this.newError(`Variable '${name}' is undefined`);
       }
       default: {
         return this.newNode();

@@ -16,26 +16,20 @@ export class Generator {
   public isCoroutine = false;
   public variables: { id: string; type: string }[] = [];
   public tempVariables: { id: string; type: string }[] = [];
-
-  private errorAndExit(message: string, node?: Node) {
-    const errorNode = node ? node : this.node;
-    console.error(
-      "\x1b[31m%s\x1b[0m",
-      `Error at (${errorNode.line}:${errorNode.col}) in '${path.resolve(
-        this.filePath
-      )}': ${message}`
-    );
-    process.exit(1);
-  }
+  public variableMap: Record<string, number> = {};
 
   private errorAndContinue(message: string, node?: Node) {
     const errorNode = node ? node : this.node;
+    const resolved = path.resolve(this.filePath);
     console.error(
       "\x1b[31m%s\x1b[0m",
-      `Error at (${errorNode.line}:${errorNode.col}) in '${path.resolve(
-        this.filePath
-      )}': ${message}`
+      `Error at (${resolved}:${errorNode.line}:${errorNode.col}): ${message}`
     );
+  }
+
+  private errorAndExit(message: string, node?: Node) {
+    this.errorAndContinue(message, node);
+    process.exit(1);
   }
 
   constructor(nodes: Node[], filePath: string = ".") {
@@ -141,7 +135,10 @@ export class Generator {
               this.newNode(NodeTypeEnum.LoadTemp, tempVariableIndex)
             );
           } else {
-            this.errorAndExit(`Variable '${node.value}' is undefined`);
+            this.generatedNodes.push(
+              this.newNode(NodeTypeEnum.LoadSymbol, node.value)
+            );
+            // this.errorAndExit(`Variable '${node.value}' is undefined`);
           }
         } else {
           this.generatedNodes.push({
@@ -168,82 +165,87 @@ export class Generator {
         return;
       }
       case NodeTypeEnum.Operator: {
-        if (node.value === "=" && node.left.type === NodeTypeEnum.ID) {
-          if (captureIds) {
-            this.capturedIds.push(node.left.value);
-          }
-          const idStringNode = this.newNode(
-            NodeTypeEnum.String,
-            node.left.value
-          );
-          idStringNode.index = this.variables.findIndex(
-            (e) => e.id === node.left.value
-          );
-          if (idStringNode.index === -1) {
-            this.errorAndExit(`Variable '${node.left.value}' is undefined`);
-          }
-          if (this.variables[idStringNode.index].type === "const") {
-            this.errorAndExit(
-              `Const variable '${node.left.value}' cannot be re-assigned`
-            );
-          }
-          this.generatedNodes.push(
-            // this.newNode(NodeTypeEnum.String, node.left.value)
-            idStringNode
-          );
-          this.generateBytecode(node.right, false, captureIds);
-          this.generatedNodes.push(this.newNode(NodeTypeEnum.Equal));
-          if (pop) {
-            this.generatedNodes.push(this.newNode(NodeTypeEnum.Pop));
-          }
-          return;
-        }
-        if (
-          (node.value === "=" && node.left.type === NodeTypeEnum.Accessor) ||
-          (node.value === "=" &&
-            node.left.type === NodeTypeEnum.Operator &&
-            node.left.value === ".")
-        ) {
-          const flattened = this.flattenChildren(node.left, [
-            ".",
-            NodeTypeEnum[NodeTypeEnum.Accessor],
-          ]);
-          flattened.slice(0, -1).forEach((elem: Node, index) => {
-            if (index > 0) {
-              if (elem.type === NodeTypeEnum.ID) {
-                if (captureIds) {
-                  this.capturedIds.push(elem.value);
-                }
-                elem.type = NodeTypeEnum.String;
-              }
-              if (elem.type === NodeTypeEnum.List) {
-                elem = elem.node;
-              }
-              this.generateBytecode(elem, false, captureIds);
-            } else {
-              this.generateBytecode(elem, false, captureIds);
-            }
-            if (index >= 1 && elem.type !== NodeTypeEnum.FunctionCall) {
-              this.generatedNodes.push(this.newNode(NodeTypeEnum.Accessor));
-            }
-          });
-          var lastElem = flattened.at(-1);
-          if (lastElem.type === NodeTypeEnum.ID) {
+        if (node.value === "=") {
+          if (node.left.type === NodeTypeEnum.ID) {
             if (captureIds) {
-              this.capturedIds.push(lastElem.value);
+              this.capturedIds.push(node.left.value);
             }
-            lastElem.type = NodeTypeEnum.String;
+            const idStringNode = this.newNode(
+              NodeTypeEnum.String,
+              node.left.value
+            );
+            idStringNode.index = this.variables.findIndex(
+              (e) => e.id === node.left.value
+            );
+            // if (idStringNode.index === -1) {
+            //   this.errorAndExit(`Variable '${node.left.value}' is undefined`);
+            // }
+            if (
+              idStringNode.index >= 0 &&
+              this.variables[idStringNode.index].type === "const"
+            ) {
+              this.errorAndExit(
+                `Const variable '${node.left.value}' cannot be re-assigned`
+              );
+            }
+            this.generatedNodes.push(
+              // this.newNode(NodeTypeEnum.String, node.left.value)
+              idStringNode
+            );
+            this.generateBytecode(node.right, false, captureIds);
+            this.generatedNodes.push(this.newNode(NodeTypeEnum.Equal));
+            if (pop) {
+              this.generatedNodes.push(this.newNode(NodeTypeEnum.Pop));
+            }
+            return;
           }
-          if (lastElem.type === NodeTypeEnum.List) {
-            lastElem = lastElem.node;
+          if (
+            node.left.type === NodeTypeEnum.Accessor ||
+            (node.left.type === NodeTypeEnum.Operator &&
+              node.left.value === ".")
+          ) {
+            const flattened = this.flattenChildren(node.left, [
+              ".",
+              NodeTypeEnum[NodeTypeEnum.Accessor],
+            ]);
+            flattened.slice(0, -1).forEach((elem: Node, index) => {
+              if (index > 0) {
+                if (elem.type === NodeTypeEnum.ID) {
+                  if (captureIds) {
+                    this.capturedIds.push(elem.value);
+                  }
+                  elem.type = NodeTypeEnum.String;
+                }
+                if (elem.type === NodeTypeEnum.List) {
+                  elem = elem.node;
+                }
+                this.generateBytecode(elem, false, captureIds);
+              } else {
+                this.generateBytecode(elem, false, captureIds);
+              }
+              if (index >= 1 && elem.type !== NodeTypeEnum.FunctionCall) {
+                this.generatedNodes.push(this.newNode(NodeTypeEnum.Accessor));
+              }
+            });
+            var lastElem = flattened.at(-1);
+            if (lastElem.type === NodeTypeEnum.ID) {
+              if (captureIds) {
+                this.capturedIds.push(lastElem.value);
+              }
+              lastElem.type = NodeTypeEnum.String;
+            }
+            if (lastElem.type === NodeTypeEnum.List) {
+              lastElem = lastElem.node;
+            }
+            this.generateBytecode(node.right, false, captureIds);
+            this.generateBytecode(lastElem, false, captureIds);
+            this.generatedNodes.push(this.newNode(NodeTypeEnum.ModifyProperty));
+            if (pop) {
+              this.generatedNodes.push(this.newNode(NodeTypeEnum.Pop));
+            }
+            return;
           }
-          this.generateBytecode(node.right, false, captureIds);
-          this.generateBytecode(lastElem, false, captureIds);
-          this.generatedNodes.push(this.newNode(NodeTypeEnum.ModifyProperty));
-          if (pop) {
-            this.generatedNodes.push(this.newNode(NodeTypeEnum.Pop));
-          }
-          return;
+          this.errorAndExit("Malformed assignment");
         }
         if (node.value === ".") {
           const flattened = this.flattenChildren(node, [
@@ -581,6 +583,7 @@ export class Generator {
               );
             }
           } else {
+            this.variableMap[node.declNode.id.value] = this.variables.length;
             this.variables.push({
               id: node.declNode.id.value,
               type: node.value,
@@ -610,6 +613,7 @@ export class Generator {
                 );
               }
             } else {
+              this.variableMap[elem.value] = this.variables.length;
               this.variables.push({ id: elem.value, type: node.value });
             }
             variableIndices.push(this.variables.length - 1);
@@ -643,6 +647,7 @@ export class Generator {
                 );
               }
             } else {
+              this.variableMap[elem.value] = this.variables.length;
               this.variables.push({ id: elem.value, type: node.value });
             }
             variableIndices.push(this.variables.length - 1);
@@ -939,6 +944,7 @@ export class Generator {
           originFilePath: this.filePath,
           closures: {},
           isCoroutine: generator.isCoroutine,
+          variableMap: generator.variableMap,
         };
         fnNode.meta = {
           capturedIds: generator.capturedIds,

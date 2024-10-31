@@ -442,7 +442,7 @@ export class VM {
     generator.capturedIds.forEach((id) => {
       const symbol = this.findSymbol_(id);
       if (symbol) {
-        this.symbols[id] = symbol;
+        vm.symbols[id] = symbol;
       }
     });
     vm.parentVM = this;
@@ -850,23 +850,28 @@ export class VM {
       const node = args[0];
       return node.class ? node.class : this.newNode();
     },
+    closures: (args: Node[]) => {
+      const symbolObject = this.newNode(NodeTypeEnum.Object, {}, true);
+      Object.keys(this.symbols).forEach((key) => {
+        const symbol = this.symbols[key];
+        !symbol?.isGlobal && (symbolObject.value[key] = symbol.node);
+      });
+      return symbolObject;
+    },
     globals: (args: Node[]) => {
       const symbolObject = this.newNode(NodeTypeEnum.Object, {}, true);
       Object.keys(this.symbols).forEach((key) => {
         const symbol = this.symbols[key];
-        if (symbol.isGlobal) {
-          symbolObject.value[key] = this.symbols[key].node;
-        }
+        symbol?.isGlobal && (symbolObject.value[key] = symbol.node);
       });
       return symbolObject;
     },
     locals: (args: Node[]) => {
       const symbolObject = this.newNode(NodeTypeEnum.Object, {}, true);
-      Object.keys(this.symbols).forEach((key) => {
-        const symbol = this.symbols[key];
-        if (!symbol.isGlobal) {
-          symbolObject.value[key] = this.symbols[key].node;
-        }
+      Object.keys(this.variableMap).forEach((key) => {
+        const index = this.variableMap[key];
+        const symbol = this.symbolsArray[index];
+        symbol && (symbolObject.value[key] = symbol.node);
       });
       return symbolObject;
     },
@@ -1505,7 +1510,8 @@ export class VM {
 
     // fnName && (fn = this.tempVars[fnName]?.node ?? this.symbols[fnName]?.node);
 
-    fn = this.symbolsArray[fn.index]?.node ?? this.symbols[fnName]?.node;
+    fnName &&
+      (fn = this.symbolsArray[fn.index]?.node ?? this.symbols[fnName]?.node);
 
     if (!fn) {
       this.errorAndContinue(`Function '${fnName}' is undefined`);
@@ -1547,6 +1553,7 @@ export class VM {
       newfn.funcNode.closures = {};
       fn = structuredClone(newfn);
       fn.funcNode.closures = closures;
+      fn.funcNode.symbolsArray = [];
       fn.funcNode.coroutineIndex = 0;
       if (fn.funcNode.params.length > 0) {
         const initParam = fn.funcNode.params.shift();
@@ -1566,9 +1573,8 @@ export class VM {
       for (const key in fn.funcNode.closures) {
         vm.symbols[key] = fn.funcNode.closures[key];
       }
-      for (const symbol in fn.funcNode.coroutineSymbols) {
-        vm.symbols[symbol] = fn.funcNode.coroutineSymbols[symbol];
-      }
+
+      vm.symbolsArray = fn.funcNode.symbolsArray;
 
       vm.index = fn.funcNode.coroutineIndex;
       vm.node = vm.nodes[vm.index];
@@ -1624,6 +1630,8 @@ export class VM {
       };
     }
 
+    !fnName && (fnName = fn.funcNode?.name);
+
     if (fn.schema) {
       Object.keys(fn.schema.value).forEach((key) => {
         const schemaProp = fn.schema.value[key];
@@ -1654,6 +1662,10 @@ export class VM {
     if (fn.funcNode?.isCoroutine) {
       fn.funcNode.coroutineIndex = vm.index + 1;
       fn.funcNode.coroutineSymbols = vm.symbols;
+      Object.entries(vm.variableMap).forEach(([key, index]) => {
+        const symbol = vm.symbolsArray[index];
+        fn.funcNode.symbolsArray[index] = symbol;
+      });
     }
 
     return res;
@@ -1772,10 +1784,14 @@ export class VM {
       if (symbol) {
         fn.funcNode.closures[id] = symbol;
       }
-      // const symbol = this.findSymbol(id);
-      // if (symbol) {
-      //   fn.funcNode.closures[id] = symbol;
-      // }
+    });
+
+    // Inject globals
+
+    Object.entries(this.symbols).forEach(([key, value]) => {
+      if (value.isGlobal) {
+        fn.funcNode.closures[key] = value;
+      }
     });
 
     return fn;

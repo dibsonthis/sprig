@@ -524,11 +524,11 @@
 
 // dis(fn)
 
-// const time = exec(`() => performance.now()`)
+const time = exec(`() => performance.now()`)
 
-// var res = 0
+var res = 0
 
-// const arr = 1..10000
+// const arr = 1..1000
 
 // const startTime = time()
 
@@ -540,18 +540,6 @@
 
 // const endTime = time()
 
-// print(`Duration: {{(endTime - startTime) / 1000}} s`)
-
 // print(res)
 
-const g = 100
-
-const fn = () => {
-    const inner = () => {
-        const g = 400
-    }
-}
-
-const inner = fn()
-inner()
-print(g)
+// print(`Duration: {{((endTime - startTime) / 1000)->truncate(3)}} s`)

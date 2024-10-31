@@ -246,7 +246,13 @@ export type FuncNode = {
   originFilePath?: string;
   isCoroutine?: boolean;
   coroutineIndex?: number;
-  coroutineSymbols?: SymbolTable;
+  symbolsArray?: {
+    node: Node;
+    const: boolean;
+    canChange?: boolean;
+    isGlobal?: boolean;
+    isClosure?: boolean;
+  }[];
   variableMap?: Record<string, number>;
   meta?: {};
 };

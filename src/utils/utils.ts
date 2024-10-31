@@ -98,6 +98,7 @@ export const injectCommonAndModules = (
       commonParser.nodes,
       commonParser.filePath
     );
+
     commonGenerator.generate();
 
     const commonVM = new VM(
@@ -105,13 +106,18 @@ export const injectCommonAndModules = (
       commonParser.filePath
     );
 
+    commonVM.variableMap = commonGenerator.variableMap;
+    commonVM.variables = commonGenerator.variables;
+    commonVM.tempVariables = commonGenerator.tempVariables;
+
     commonVM.evaluate();
 
-    Object.keys(commonVM.symbols).forEach((k) => {
-      commonVM.symbols[k].isGlobal = true;
+    Object.keys(commonVM.variableMap).forEach((k) => {
+      const index = commonVM.variableMap[k];
+      const symbol = commonVM.symbolsArray[index];
+      symbol.isGlobal = true;
+      vm.symbols[k] = symbol;
     });
-
-    vm.symbols = { ...vm.symbols, ...commonVM.symbols };
 
     const moduleObject = commonParser.newNode(NodeTypeEnum.Object, {});
     moduleObject.evaluated = true;
@@ -165,6 +171,10 @@ export const injectCommonAndModules = (
         moduleParser.filePath
       );
 
+      moduleVM.variableMap = moduleGenerator.variableMap;
+      moduleVM.variables = moduleGenerator.variables;
+      moduleVM.tempVariables = moduleGenerator.tempVariables;
+
       Object.keys(vm.symbols).forEach((key) => {
         const symbol = vm.symbols[key];
         if (symbol.isGlobal) {
@@ -180,12 +190,20 @@ export const injectCommonAndModules = (
 
       const moduleObject = moduleParser.newNode(NodeTypeEnum.Object, {});
       moduleObject.evaluated = true;
-      Object.keys(moduleVM.symbols).forEach((key) => {
+      Object.keys(moduleVM.variableMap).forEach((key) => {
+        const index = moduleVM.variableMap[key];
+        const symbol = moduleVM.symbolsArray[index];
         moduleObject.value[key] = {
-          ...moduleVM.symbols[key].node,
-          meta: { hiddenProp: moduleVM.symbols[key].isGlobal },
+          ...symbol.node,
+          meta: { hiddenProp: symbol.isGlobal },
         };
       });
+      // Object.keys(moduleVM.symbols).forEach((key) => {
+      //   moduleObject.value[key] = {
+      //     ...moduleVM.symbols[key].node,
+      //     meta: { hiddenProp: moduleVM.symbols[key].isGlobal },
+      //   };
+      // });
       vm.symbols[moduleNameMap[moduleName]] = {
         node: moduleObject,
         const: false,

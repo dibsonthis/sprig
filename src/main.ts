@@ -40,7 +40,7 @@ const commonPath = debug
 
 const modulesPath = path.join(__dirname, "modules");
 
-injectCommonAndModules(vm, commonPath, modulesPath);
+// injectCommonAndModules(vm, commonPath, modulesPath);
 
 process.chdir(path.dirname(filePath));
 

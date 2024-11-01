@@ -124,6 +124,10 @@ export const injectCommonAndModules = (
     Object.keys(commonVM.symbols).forEach((key) => {
       moduleObject.value[key] = commonVM.symbols[key].node;
     });
+    Object.keys(commonVM.variableMap).forEach((key) => {
+      const index = commonVM.variableMap[key];
+      moduleObject.value[key] = commonVM.symbolsArray[index].node;
+    });
     vm.symbols.__common = { node: moduleObject, const: false, isGlobal: true };
   } catch (e) {
     console.warn(

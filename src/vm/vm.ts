@@ -20,6 +20,7 @@ export class VM {
     isClosure?: boolean;
   }[] = [];
   tempVarsArray: {
+    id?: string;
     node: Node;
     const: boolean;
     canChange?: boolean;
@@ -255,7 +256,7 @@ export class VM {
         return repr;
       }
       case NodeTypeEnum.Function: {
-        const params = node.funcNode.params
+        const params = (node.funcNode.params ?? [])
           .map((e) => {
             return this.toString(e);
           })
@@ -433,23 +434,29 @@ export class VM {
     const vm = new VM(generator.generatedNodes, parser.filePath);
     vm.capturedIds = generator.capturedIds;
     this.capturedIds = [...this.capturedIds, ...vm.capturedIds];
-    // generator.capturedIds.forEach((id) => {
-    //   const symbol = this.findSymbol(id);
-    //   if (symbol) {
-    //     this.symbols[id] = symbol;
-    //   }
-    // });
+
     generator.capturedIds.forEach((id) => {
       const symbol = this.findSymbol_(id);
       if (symbol) {
         vm.symbols[id] = symbol;
+      } else {
+        const closure = this.findSymbol(id);
+        if (closure) {
+          vm.symbols[id] = closure;
+        }
       }
     });
+
+    this.tempVarsArray.forEach((variable) => {
+      vm.symbols[variable.id] = variable;
+    });
+
     vm.parentVM = this;
     vm.functionName = "eval";
     vm.builtins = this.builtins;
     vm.meta = this.meta;
     vm.injectBuiltins = this.injectBuiltins;
+
     if (this.injectBuiltins) {
       vm.builtins = {
         ...this.builtins,
@@ -465,7 +472,7 @@ export class VM {
         vm.symbols[prop] = { node: env.value[prop], const: false };
       }
     } else {
-      vm.symbols = this.symbols;
+      vm.symbols = { ...this.symbols, ...vm.symbols };
       vm.tempVars = this.tempVars;
       vm.operators = this.operators;
       vm.symbolsArray = this.symbolsArray;
@@ -1327,12 +1334,14 @@ export class VM {
 
     if (node.forLoopStartNode.valueName) {
       this.tempVarsArray[node.forLoopStartNode.valueIndex] = {
+        id: node.forLoopStartNode.valueName,
         node: node.forLoopStartNode.arr[node.forLoopStartNode.count],
         const: false,
       };
     }
     if (node.forLoopStartNode.indexName) {
       this.tempVarsArray[node.forLoopStartNode.indexIndex] = {
+        id: node.forLoopStartNode.indexName,
         node: this.newNode(NodeTypeEnum.Number, node.forLoopStartNode.count),
         const: false,
       };
@@ -1508,8 +1517,6 @@ export class VM {
       return this.builtins[fnName](args);
     }
 
-    // fnName && (fn = this.tempVars[fnName]?.node ?? this.symbols[fnName]?.node);
-
     fnName &&
       (fn = this.symbolsArray[fn.index]?.node ?? this.symbols[fnName]?.node);
 
@@ -1584,6 +1591,13 @@ export class VM {
       }
     }
 
+    fn.meta?.capturedIds?.forEach((id) => {
+      const closure = this.findSymbol(id);
+      if (closure) {
+        fn.funcNode.closures[id] = closure;
+      }
+    });
+
     if (fnName && !vm.symbols[fnName]) {
       vm.symbols[fnName] = { node: fn, const: false };
     }
@@ -1652,6 +1666,20 @@ export class VM {
         }
       });
     }
+
+    fn.value = fn.value.map((n) => {
+      if (n.type === NodeTypeEnum.StartForLoop) {
+        return {
+          ...n,
+          forLoopStartNode: {
+            ...n.forLoopStartNode,
+            arr: undefined,
+            count: -1,
+          },
+        };
+      }
+      return n;
+    });
 
     const res = vm.evaluate();
 
@@ -1783,6 +1811,11 @@ export class VM {
       const symbol = this.findSymbol_(id);
       if (symbol) {
         fn.funcNode.closures[id] = symbol;
+      } else {
+        const closure = this.findSymbol(id);
+        if (closure) {
+          fn.funcNode.closures[id] = closure;
+        }
       }
     });
 
@@ -2090,6 +2123,10 @@ export class VM {
         generator.generate();
 
         const vm = new VM(generator.generatedNodes, generator.filePath);
+        vm.variables = generator.variables;
+        vm.tempVariables = generator.tempVariables;
+        vm.variableMap = generator.variableMap;
+
         vm.operators = this.operators;
         vm.parentVM = this;
         vm.injectBuiltins = this.injectBuiltins;
@@ -2134,9 +2171,18 @@ export class VM {
           const moduleObject = this.newNode(NodeTypeEnum.Object, {});
           moduleObject.evaluated = true;
           Object.keys(vm.symbols).forEach((key) => {
+            const symbol = vm.symbols[key];
             moduleObject.value[key] = {
-              ...vm.symbols[key].node,
-              meta: { hiddenProp: vm.symbols[key].isGlobal },
+              ...symbol.node,
+              meta: { hiddenProp: symbol.isGlobal },
+            };
+          });
+          Object.keys(vm.variableMap).forEach((key) => {
+            const index = vm.variableMap[key];
+            const symbol = vm.symbolsArray[index];
+            moduleObject.value[key] = {
+              ...symbol.node,
+              meta: { hiddenProp: symbol.isGlobal },
             };
           });
           this.symbols[moduleName.value] = { node: moduleObject, const: false };

@@ -122,30 +122,40 @@ export class Generator {
         if (captureIds) {
           this.capturedIds.push(node.value);
         }
-        const variableIndex = this.variables.findIndex(
+
+        // Check temp vars
+        let variableIndex = this.tempVariables.findIndex(
           (e) => e.id === node.value
         );
-        if (variableIndex === -1) {
-          // Check temp vars
-          const tempVariableIndex = this.tempVariables.findIndex(
-            (e) => e.id === node.value
+
+        if (variableIndex !== -1) {
+          this.generatedNodes.push(
+            this.newNode(NodeTypeEnum.LoadTemp, variableIndex)
           );
-          if (tempVariableIndex != -1) {
-            this.generatedNodes.push(
-              this.newNode(NodeTypeEnum.LoadTemp, tempVariableIndex)
-            );
-          } else {
-            this.generatedNodes.push(
-              this.newNode(NodeTypeEnum.LoadSymbol, node.value)
-            );
-            // this.errorAndExit(`Variable '${node.value}' is undefined`);
+          if (pop) {
+            this.generatedNodes.push(this.newNode(NodeTypeEnum.Pop));
           }
-        } else {
+          return;
+        }
+
+        // Check vars
+        variableIndex = this.variables.findIndex((e) => e.id === node.value);
+
+        if (variableIndex !== -1) {
           this.generatedNodes.push({
             ...node,
             index: variableIndex,
           });
+          if (pop) {
+            this.generatedNodes.push(this.newNode(NodeTypeEnum.Pop));
+          }
+          return;
         }
+
+        // global
+        this.generatedNodes.push(
+          this.newNode(NodeTypeEnum.LoadSymbol, node.value)
+        );
         if (pop) {
           this.generatedNodes.push(this.newNode(NodeTypeEnum.Pop));
         }
@@ -566,6 +576,7 @@ export class Generator {
       }
       case NodeTypeEnum.Decl: {
         const variableIndices = [];
+        let variableIndex = 0;
         let isClass = false;
         if (node.declNode.id.type === NodeTypeEnum.Paren) {
           isClass = true;
@@ -583,6 +594,7 @@ export class Generator {
               );
             }
           } else {
+            variableIndex = this.variables.length;
             this.variableMap[node.declNode.id.value] = this.variables.length;
             this.variables.push({
               id: node.declNode.id.value,
@@ -661,7 +673,7 @@ export class Generator {
           ...node,
           declNode: {
             isClass,
-            variableIndex: this.variables.length - 1,
+            variableIndex: variableIndex,
             variableIndices,
           },
         });
@@ -713,8 +725,22 @@ export class Generator {
             fnIdString.index = this.variables.findIndex(
               (e) => e.id === node.left.value
             );
+            if (fnIdString.index == -1) {
+              fnIdString.index = this.tempVariables.findIndex(
+                (e) => e.id === node.left.value
+              );
+              if (fnIdString.index >= 0) {
+                this.generatedNodes.push(
+                  this.newNode(NodeTypeEnum.LoadTemp, fnIdString.index)
+                );
+              } else {
+                this.generatedNodes.push(fnIdString);
+              }
+            } else {
+              this.generatedNodes.push(fnIdString);
+            }
             // todo: change these to Load bytecode
-            this.generatedNodes.push(fnIdString);
+            // this.generatedNodes.push(fnIdString);
           } else {
             this.generateBytecode(node.left, false, captureIds);
           }
@@ -863,6 +889,15 @@ export class Generator {
             );
           } else if (e.left.type === NodeTypeEnum.List) {
             e.left.node = this.newNode(NodeTypeEnum.String, e.left.node.value);
+            let index = this.variables.findIndex(
+              (elem) => elem.id === e.left.node.value
+            );
+            if (index == -1) {
+              index = this.tempVariables.findIndex(
+                (elem) => elem.id === e.left.node.value
+              );
+            }
+            e.left.node.index = index;
             this.generateBytecode(e.left, false, captureIds);
           }
           this.generateBytecode(e.right, false, captureIds);

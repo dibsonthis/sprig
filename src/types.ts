@@ -161,7 +161,7 @@ export enum NodeTypeEnum {
   LoadTemp,
   Load,
   LoadSymbol,
-  StoreValue,
+  Store,
 }
 
 export const NodeTypes = [

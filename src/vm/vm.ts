@@ -1181,45 +1181,8 @@ export class VM {
   }
 
   private evaluateID(node: Node) {
-    // Symbol Array - experimental
     const _symbol = this.symbolsArray[node.index];
     return _symbol.node;
-    // if (_symbol) {
-    //   return _symbol.node;
-    // }
-
-    // if (this.builtins.hasOwnProperty(node.value)) {
-    //   const native = this.newNode(NodeTypeEnum.Native);
-    //   native.nativeNode = {
-    //     name: node.value,
-    //     function: this.builtins[node.value],
-    //     builtin: true,
-    //   };
-    //   return native;
-    // }
-
-    // --- //
-
-    // let symbol;
-    // if (this.tempVars.hasOwnProperty(node.value)) {
-    //   symbol = this.tempVars[node.value];
-    // } else {
-    //   symbol = this.symbols[node.value];
-    // }
-
-    // if (!symbol) {
-    //   if (this.builtins.hasOwnProperty(node.value)) {
-    //     const native = this.newNode(NodeTypeEnum.Native);
-    //     native.nativeNode = {
-    //       name: node.value,
-    //       function: this.builtins[node.value],
-    //       builtin: true,
-    //     };
-    //     return native;
-    //   }
-    //   return this.newError(`Variable '${node.value}' is not defined`);
-    // }
-    // return symbol.node;
   }
 
   private resetLoops() {
@@ -2653,7 +2616,7 @@ export class VM {
         }
         return this.newError(`Variable '${name}' is undefined`);
       }
-      case NodeTypeEnum.StoreValue: {
+      case NodeTypeEnum.Store: {
         var value = this.stack.pop();
         this.symbolsArray[node.value].node = value;
         return value;

@@ -195,9 +195,7 @@ export class Generator {
                 );
               }
               this.generateBytecode(node.right, false, captureIds);
-              this.generatedNodes.push(
-                this.newNode(NodeTypeEnum.StoreValue, index)
-              );
+              this.generatedNodes.push(this.newNode(NodeTypeEnum.Store, index));
             } else {
               const idStringNode = this.newNode(
                 NodeTypeEnum.String,

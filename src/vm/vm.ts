@@ -1591,13 +1591,6 @@ export class VM {
       }
     }
 
-    fn.meta?.capturedIds?.forEach((id) => {
-      const closure = this.findSymbol(id);
-      if (closure) {
-        fn.funcNode.closures[id] = closure;
-      }
-    });
-
     if (fnName && !vm.symbols[fnName]) {
       vm.symbols[fnName] = { node: fn, const: false };
     }
@@ -1615,10 +1608,15 @@ export class VM {
           catchAll.nodes.push(arg);
         }
 
-        vm.symbols[param.value] = {
+        vm.symbolsArray.push({
           node: catchAll,
           const: false,
-        };
+        });
+
+        // vm.symbols[param.value] = {
+        //   node: catchAll,
+        //   const: false,
+        // };
       } else {
         const defaultParam = fn.funcNode.defaults[param.value];
 
@@ -1630,18 +1628,27 @@ export class VM {
           paramValue = args[index];
         }
 
-        vm.symbols[param.value] = {
+        vm.symbolsArray.push({
           node: paramValue,
           const: false,
-        };
+        });
+
+        // vm.symbols[param.value] = {
+        //   node: paramValue,
+        //   const: false,
+        // };
       }
     });
 
     for (const prop in namedArgs) {
-      vm.symbols[prop] = {
+      vm.symbolsArray.push({
         node: namedArgs[prop],
         const: false,
-      };
+      });
+      // vm.symbols[prop] = {
+      //   node: namedArgs[prop],
+      //   const: false,
+      // };
     }
 
     !fnName && (fnName = fn.funcNode?.name);
@@ -1649,7 +1656,8 @@ export class VM {
     if (fn.schema) {
       Object.keys(fn.schema.value).forEach((key) => {
         const schemaProp = fn.schema.value[key];
-        const valueType = NodeTypeEnum[vm.symbols[key].node.type];
+        const index = vm.variableMap[key];
+        const valueType = NodeTypeEnum[vm.symbolsArray[index].node.type];
 
         if (schemaProp.type === NodeTypeEnum.List && schemaProp.nodes) {
           if (!schemaProp.nodes.map((e) => e.value).includes(valueType)) {

@@ -921,10 +921,11 @@ export class Generator {
           node.right.type === NodeTypeEnum.Block
             ? node.right.nodes
             : [node.right];
+        const generator = new Generator(nodes, this.filePath);
         const params = this.flattenChildren(node.left.node, [","]);
         var isDefault = false;
         var isCatchAll = false;
-        params.forEach((param) => {
+        params.forEach((param, index) => {
           if (param.type === NodeTypeEnum.Operator && param.value === "=") {
             if (isCatchAll) {
               this.errorAndExit(
@@ -935,6 +936,11 @@ export class Generator {
             this.generatedNodes.push(
               this.newNode(NodeTypeEnum.String, param.left.value)
             );
+
+            const variableIndex = generator.variables.length;
+            generator.variableMap[param.left.value] = variableIndex;
+            generator.variables.push({ id: param.left.value, type: "let" });
+
             this.generateBytecode(param.right, false, captureIds);
             this.generatedNodes.push(this.newNode(NodeTypeEnum.DefaultParam));
           } else {
@@ -954,6 +960,10 @@ export class Generator {
               const catchAllParam = this.newNode(NodeTypeEnum.CatchAllParam);
               catchAllParam.value = param.right.value;
               this.generatedNodes.push(catchAllParam);
+
+              const variableIndex = generator.variables.length;
+              generator.variableMap[param.right.value] = variableIndex;
+              generator.variables.push({ id: param.right.value, type: "let" });
             } else {
               if (isCatchAll) {
                 this.errorAndExit(
@@ -963,10 +973,14 @@ export class Generator {
               this.generatedNodes.push(
                 this.newNode(NodeTypeEnum.String, param.value)
               );
+
+              const variableIndex = generator.variables.length;
+              generator.variableMap[param.value] = variableIndex;
+              generator.variables.push({ id: param.value, type: "let" });
             }
           }
         });
-        const generator = new Generator(nodes, this.filePath);
+        // const generator = new Generator(nodes, this.filePath);
         const fnByteCode = generator.generate(true);
 
         if (fnByteCode.at(-1)?.type === NodeTypeEnum.Pop) {

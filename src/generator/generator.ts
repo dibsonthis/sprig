@@ -593,6 +593,10 @@ export class Generator {
                 `Variable '${node.declNode.id.value}' cannot be re-declared`
               );
             }
+            const symbolIndex = this.variables.findIndex(
+              (e) => e.id === node.declNode.id.value
+            );
+            variableIndex = symbolIndex;
           } else {
             variableIndex = this.variables.length;
             this.variableMap[node.declNode.id.value] = this.variables.length;
@@ -888,17 +892,7 @@ export class Generator {
               this.newNode(NodeTypeEnum.String, e.left.value)
             );
           } else if (e.left.type === NodeTypeEnum.List) {
-            e.left.node = this.newNode(NodeTypeEnum.String, e.left.node.value);
-            let index = this.variables.findIndex(
-              (elem) => elem.id === e.left.node.value
-            );
-            if (index == -1) {
-              index = this.tempVariables.findIndex(
-                (elem) => elem.id === e.left.node.value
-              );
-            }
-            e.left.node.index = index;
-            this.generateBytecode(e.left, false, captureIds);
+            this.generateBytecode(e.left.node, false, true);
           }
           this.generateBytecode(e.right, false, captureIds);
         });

@@ -1568,10 +1568,10 @@ export class VM {
         if (!initArg) {
           initArg = fn.funcNode?.defaults[initParam.value] ?? this.newNode();
         }
-        fn.funcNode.closures[initParam.value] = {
+        fn.funcNode.symbolsArray.push({
           node: initArg,
           const: false,
-        };
+        });
       }
       return fn;
     }
@@ -1612,11 +1612,6 @@ export class VM {
           node: catchAll,
           const: false,
         });
-
-        // vm.symbols[param.value] = {
-        //   node: catchAll,
-        //   const: false,
-        // };
       } else {
         const defaultParam = fn.funcNode.defaults[param.value];
 
@@ -1632,23 +1627,15 @@ export class VM {
           node: paramValue,
           const: false,
         });
-
-        // vm.symbols[param.value] = {
-        //   node: paramValue,
-        //   const: false,
-        // };
       }
     });
 
     for (const prop in namedArgs) {
-      vm.symbolsArray.push({
+      const index = vm.variableMap[prop];
+      vm.symbolsArray[index] = {
         node: namedArgs[prop],
         const: false,
-      });
-      // vm.symbols[prop] = {
-      //   node: namedArgs[prop],
-      //   const: false,
-      // };
+      };
     }
 
     !fnName && (fnName = fn.funcNode?.name);

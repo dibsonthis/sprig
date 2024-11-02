@@ -7,7 +7,7 @@ import fs from "fs";
 import { NodeTypeEnum } from "./types";
 import { injectCommonAndModules } from "./utils/utils";
 
-const debug = true;
+const debug = false;
 
 const filePath = debug ? "testing/tests.sp" : process.argv[2];
 
@@ -98,8 +98,6 @@ try {
     moduleObject.value[name] = symbol.node;
   });
   vm.symbols.__config = { node: moduleObject, const: false, isGlobal: true };
-} catch (e) {
-  console.log(e);
-}
+} catch (e) {}
 
 vm.evaluate();

@@ -2630,6 +2630,9 @@ export class VM {
 
         return this.newNode(NodeTypeEnum.Boolean, left?.value >= right?.value);
       }
+      case NodeTypeEnum.Load: {
+        return this.symbolsArray[node.value].node;
+      }
       case NodeTypeEnum.LoadTemp: {
         const index = node.value;
         return this.tempVarsArray[index].node;
@@ -2649,6 +2652,11 @@ export class VM {
           return native;
         }
         return this.newError(`Variable '${name}' is undefined`);
+      }
+      case NodeTypeEnum.StoreValue: {
+        var value = this.stack.pop();
+        this.symbolsArray[node.value].node = value;
+        return value;
       }
       default: {
         return this.newNode();

@@ -142,10 +142,13 @@ export class Generator {
         variableIndex = this.variables.findIndex((e) => e.id === node.value);
 
         if (variableIndex !== -1) {
-          this.generatedNodes.push({
-            ...node,
-            index: variableIndex,
-          });
+          this.generatedNodes.push(
+            this.newNode(NodeTypeEnum.Load, variableIndex)
+          );
+          // this.generatedNodes.push({
+          //   ...node,
+          //   index: variableIndex,
+          // });
           if (pop) {
             this.generatedNodes.push(this.newNode(NodeTypeEnum.Pop));
           }
@@ -180,30 +183,31 @@ export class Generator {
             if (captureIds) {
               this.capturedIds.push(node.left.value);
             }
-            const idStringNode = this.newNode(
-              NodeTypeEnum.String,
-              node.left.value
-            );
-            idStringNode.index = this.variables.findIndex(
+
+            const index = this.variables.findIndex(
               (e) => e.id === node.left.value
             );
-            // if (idStringNode.index === -1) {
-            //   this.errorAndExit(`Variable '${node.left.value}' is undefined`);
-            // }
-            if (
-              idStringNode.index >= 0 &&
-              this.variables[idStringNode.index].type === "const"
-            ) {
-              this.errorAndExit(
-                `Const variable '${node.left.value}' cannot be re-assigned`
+
+            if (index >= 0) {
+              if (this.variables[index].type === "const") {
+                this.errorAndExit(
+                  `Const variable '${node.left.value}' cannot be re-assigned`
+                );
+              }
+              this.generateBytecode(node.right, false, captureIds);
+              this.generatedNodes.push(
+                this.newNode(NodeTypeEnum.StoreValue, index)
               );
+            } else {
+              const idStringNode = this.newNode(
+                NodeTypeEnum.String,
+                node.left.value
+              );
+
+              this.generatedNodes.push(idStringNode);
+              this.generateBytecode(node.right, false, captureIds);
+              this.generatedNodes.push(this.newNode(NodeTypeEnum.Equal));
             }
-            this.generatedNodes.push(
-              // this.newNode(NodeTypeEnum.String, node.left.value)
-              idStringNode
-            );
-            this.generateBytecode(node.right, false, captureIds);
-            this.generatedNodes.push(this.newNode(NodeTypeEnum.Equal));
             if (pop) {
               this.generatedNodes.push(this.newNode(NodeTypeEnum.Pop));
             }

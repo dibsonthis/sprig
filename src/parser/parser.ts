@@ -347,7 +347,7 @@ export class Parser {
         this.advance();
         this.nodes[parenIndex].nodes = [];
         this.nodes[parenIndex].meta = {
-          capturedIds: [],
+          capturedIds: new Set<string>(),
         };
         while (true) {
           if (

@@ -39,7 +39,7 @@ export class VM {
   public functionName: string;
   public meta: object = {};
 
-  public capturedIds = [];
+  public capturedIds = new Set<string>();
 
   // flags
   public injectBuiltins: boolean;
@@ -433,7 +433,7 @@ export class VM {
 
     const vm = new VM(generator.generatedNodes, parser.filePath);
     vm.capturedIds = generator.capturedIds;
-    this.capturedIds = [...this.capturedIds, ...vm.capturedIds];
+    this.capturedIds = new Set([...this.capturedIds, ...vm.capturedIds]);
 
     generator.capturedIds.forEach((id) => {
       const symbol = this.findSymbol_(id);

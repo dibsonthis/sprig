@@ -12,7 +12,7 @@ export class Generator {
   public cachedImports = {};
   public filePath: string;
 
-  public capturedIds = [];
+  public capturedIds = new Set<string>();
   public isCoroutine = false;
   public variables: { id: string; type: string }[] = [];
   public tempVariables: { id: string; type: string }[] = [];
@@ -120,7 +120,7 @@ export class Generator {
     switch (node.type) {
       case NodeTypeEnum.ID: {
         if (captureIds) {
-          this.capturedIds.push(node.value);
+          this.capturedIds.add(node.value);
         }
 
         // Check temp vars
@@ -181,7 +181,7 @@ export class Generator {
         if (node.value === "=") {
           if (node.left.type === NodeTypeEnum.ID) {
             if (captureIds) {
-              this.capturedIds.push(node.left.value);
+              this.capturedIds.add(node.left.value);
             }
 
             const index = this.variables.findIndex(
@@ -224,7 +224,7 @@ export class Generator {
               if (index > 0) {
                 if (elem.type === NodeTypeEnum.ID) {
                   if (captureIds) {
-                    this.capturedIds.push(elem.value);
+                    this.capturedIds.add(elem.value);
                   }
                   elem.type = NodeTypeEnum.String;
                 }
@@ -242,7 +242,7 @@ export class Generator {
             var lastElem = flattened.at(-1);
             if (lastElem.type === NodeTypeEnum.ID) {
               if (captureIds) {
-                this.capturedIds.push(lastElem.value);
+                this.capturedIds.add(lastElem.value);
               }
               lastElem.type = NodeTypeEnum.String;
             }
@@ -271,7 +271,7 @@ export class Generator {
                 elem = elem.node;
               } else if (elem.type === NodeTypeEnum.ID) {
                 if (captureIds) {
-                  this.capturedIds.push(elem.value);
+                  this.capturedIds.add(elem.value);
                 }
                 elem.type = NodeTypeEnum.String;
               }
@@ -303,7 +303,7 @@ export class Generator {
 
           if (node.right.type === NodeTypeEnum.ID) {
             if (captureIds) {
-              this.capturedIds.push(node.right.value);
+              this.capturedIds.add(node.right.value);
             }
             const fnCall = this.newNode(NodeTypeEnum.FunctionCall);
             fnCall.left = this.newNode(NodeTypeEnum.ID, node.right.value);
@@ -722,7 +722,7 @@ export class Generator {
         if (node.left) {
           if (node.left.type === NodeTypeEnum.ID) {
             if (captureIds) {
-              this.capturedIds.push(node.left.value);
+              this.capturedIds.add(node.left.value);
             }
             const fnIdString = this.newNode(
               NodeTypeEnum.String,
@@ -879,7 +879,7 @@ export class Generator {
             e.left = this.newNode(NodeTypeEnum.String, e.value);
             e.right = this.newNode(NodeTypeEnum.ID, e.value);
             if (captureIds) {
-              this.capturedIds.push(e.value);
+              this.capturedIds.add(e.value);
             }
             e.type = NodeTypeEnum.Operator;
             e.value = ":";

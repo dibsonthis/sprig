@@ -302,7 +302,7 @@ export type Node = {
     stringType?: "double" | "single" | "special";
     unary?: boolean;
     runtimeChecks?: any[];
-    capturedIds?: string[];
+    capturedIds?: Set<string>;
     swapTos?: boolean;
     hiddenProp?: boolean;
   };

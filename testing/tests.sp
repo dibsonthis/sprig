@@ -496,6 +496,22 @@
 
 // Test.run(...tests)
 
-var x = [1,2,3] + (1..20)
-x += [50];
-print(x)
+const time = exec(`() => performance.now()`)
+
+let res = 0
+
+const arr = 0..5000
+
+const startTime = time()
+
+for (arr, x) {
+    for (arr, y) {
+        res += x + y
+    }
+}
+
+const endTime = time()
+
+println(res)
+
+print(`Duration: {{((endTime - startTime) / 1000)->truncate(3)}} s`)

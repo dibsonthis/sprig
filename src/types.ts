@@ -158,6 +158,11 @@ export enum NodeTypeEnum {
   FunctionCallBegin,
   SwapStack,
   CatchAllParam,
+  LoadTemp,
+  Load,
+  LoadSymbol,
+  Store,
+  AddAssign,
 }
 
 export const NodeTypes = [
@@ -230,6 +235,8 @@ type DeclNode = {
   id?: Node;
   value?: Node;
   isClass?: boolean;
+  variableIndex?: number;
+  variableIndices?: number[];
 };
 
 export type FuncNode = {
@@ -241,7 +248,14 @@ export type FuncNode = {
   originFilePath?: string;
   isCoroutine?: boolean;
   coroutineIndex?: number;
-  coroutineSymbols?: SymbolTable;
+  symbolsArray?: {
+    node: Node;
+    const: boolean;
+    canChange?: boolean;
+    isGlobal?: boolean;
+    isClosure?: boolean;
+  }[];
+  variableMap?: Record<string, number>;
   meta?: {};
 };
 
@@ -261,6 +275,8 @@ export type ForLoopStartNode = {
   arr?: Node[];
   valueName?: string;
   indexName?: string;
+  valueIndex?: number;
+  indexIndex?: number;
 };
 
 export type Node = {
@@ -281,12 +297,13 @@ export type Node = {
   schema?: Node;
   handler?: Node;
   class?: Node;
+  index?: number;
   meta?: {
     readonly?: boolean;
     stringType?: "double" | "single" | "special";
     unary?: boolean;
     runtimeChecks?: any[];
-    capturedIds?: string[];
+    capturedIds?: Set<string>;
     swapTos?: boolean;
     hiddenProp?: boolean;
   };

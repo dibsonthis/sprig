@@ -12,29 +12,24 @@ export class Generator {
   public cachedImports = {};
   public filePath: string;
 
-  public capturedIds = [];
-
+  public capturedIds = new Set<string>();
   public isCoroutine = false;
-
-  private errorAndExit(message: string, node?: Node) {
-    const errorNode = node ? node : this.node;
-    console.error(
-      "\x1b[31m%s\x1b[0m",
-      `Error at (${errorNode.line}:${errorNode.col}) in '${path.resolve(
-        this.filePath
-      )}': ${message}`
-    );
-    process.exit(1);
-  }
+  public variables: { id: string; type: string }[] = [];
+  public tempVariables: { id: string; type: string }[] = [];
+  public variableMap: Record<string, number> = {};
 
   private errorAndContinue(message: string, node?: Node) {
     const errorNode = node ? node : this.node;
+    const resolved = path.resolve(this.filePath);
     console.error(
       "\x1b[31m%s\x1b[0m",
-      `Error at (${errorNode.line}:${errorNode.col}) in '${path.resolve(
-        this.filePath
-      )}': ${message}`
+      `Error at (${resolved}:${errorNode.line}:${errorNode.col}): ${message}`
     );
+  }
+
+  private errorAndExit(message: string, node?: Node) {
+    this.errorAndContinue(message, node);
+    process.exit(1);
   }
 
   constructor(nodes: Node[], filePath: string = ".") {
@@ -125,8 +120,45 @@ export class Generator {
     switch (node.type) {
       case NodeTypeEnum.ID: {
         if (captureIds) {
-          this.capturedIds.push(node.value);
+          this.capturedIds.add(node.value);
         }
+
+        // Check temp vars
+        let variableIndex = this.tempVariables.findIndex(
+          (e) => e.id === node.value
+        );
+
+        if (variableIndex !== -1) {
+          this.generatedNodes.push(
+            this.newNode(NodeTypeEnum.LoadTemp, variableIndex)
+          );
+          if (pop) {
+            this.generatedNodes.push(this.newNode(NodeTypeEnum.Pop));
+          }
+          return;
+        }
+
+        // Check vars
+        variableIndex = this.variables.findIndex((e) => e.id === node.value);
+
+        if (variableIndex !== -1) {
+          this.generatedNodes.push(
+            this.newNode(NodeTypeEnum.Load, variableIndex)
+          );
+          if (pop) {
+            this.generatedNodes.push(this.newNode(NodeTypeEnum.Pop));
+          }
+          return;
+        }
+
+        // global
+        this.generatedNodes.push(
+          this.newNode(NodeTypeEnum.LoadSymbol, node.value)
+        );
+        if (pop) {
+          this.generatedNodes.push(this.newNode(NodeTypeEnum.Pop));
+        }
+        return;
       }
       case NodeTypeEnum.String:
       case NodeTypeEnum.Number:
@@ -142,66 +174,86 @@ export class Generator {
         return;
       }
       case NodeTypeEnum.Operator: {
-        if (node.value === "=" && node.left.type === NodeTypeEnum.ID) {
-          if (captureIds) {
-            this.capturedIds.push(node.left.value);
-          }
-          this.generatedNodes.push(
-            this.newNode(NodeTypeEnum.String, node.left.value)
-          );
-          this.generateBytecode(node.right, false, captureIds);
-          this.generatedNodes.push(this.newNode(NodeTypeEnum.Equal));
-          if (pop) {
-            this.generatedNodes.push(this.newNode(NodeTypeEnum.Pop));
-          }
-          return;
-        }
-        if (
-          (node.value === "=" && node.left.type === NodeTypeEnum.Accessor) ||
-          (node.value === "=" &&
-            node.left.type === NodeTypeEnum.Operator &&
-            node.left.value === ".")
-        ) {
-          const flattened = this.flattenChildren(node.left, [
-            ".",
-            NodeTypeEnum[NodeTypeEnum.Accessor],
-          ]);
-          flattened.slice(0, -1).forEach((elem: Node, index) => {
-            if (index > 0) {
-              if (elem.type === NodeTypeEnum.ID) {
-                if (captureIds) {
-                  this.capturedIds.push(elem.value);
-                }
-                elem.type = NodeTypeEnum.String;
-              }
-              if (elem.type === NodeTypeEnum.List) {
-                elem = elem.node;
-              }
-              this.generateBytecode(elem, false, captureIds);
-            } else {
-              this.generateBytecode(elem, false, captureIds);
-            }
-            if (index >= 1 && elem.type !== NodeTypeEnum.FunctionCall) {
-              this.generatedNodes.push(this.newNode(NodeTypeEnum.Accessor));
-            }
-          });
-          var lastElem = flattened.at(-1);
-          if (lastElem.type === NodeTypeEnum.ID) {
+        if (node.value === "=") {
+          if (node.left.type === NodeTypeEnum.ID) {
             if (captureIds) {
-              this.capturedIds.push(lastElem.value);
+              this.capturedIds.add(node.left.value);
             }
-            lastElem.type = NodeTypeEnum.String;
+
+            const index = this.variables.findIndex(
+              (e) => e.id === node.left.value
+            );
+
+            if (index >= 0) {
+              if (this.variables[index].type === "const") {
+                this.errorAndExit(
+                  `Const variable '${node.left.value}' cannot be re-assigned`
+                );
+              }
+              this.generateBytecode(node.right, false, captureIds);
+              this.generatedNodes.push(this.newNode(NodeTypeEnum.Store, index));
+            } else {
+              const idStringNode = this.newNode(
+                NodeTypeEnum.String,
+                node.left.value
+              );
+
+              this.generatedNodes.push(idStringNode);
+              this.generateBytecode(node.right, false, captureIds);
+              this.generatedNodes.push(this.newNode(NodeTypeEnum.Equal));
+            }
+            if (pop) {
+              this.generatedNodes.push(this.newNode(NodeTypeEnum.Pop));
+            }
+            return;
           }
-          if (lastElem.type === NodeTypeEnum.List) {
-            lastElem = lastElem.node;
+          if (
+            node.left.type === NodeTypeEnum.Accessor ||
+            (node.left.type === NodeTypeEnum.Operator &&
+              node.left.value === ".")
+          ) {
+            const flattened = this.flattenChildren(node.left, [
+              ".",
+              NodeTypeEnum[NodeTypeEnum.Accessor],
+            ]);
+            flattened.slice(0, -1).forEach((elem: Node, index) => {
+              if (index > 0) {
+                if (elem.type === NodeTypeEnum.ID) {
+                  if (captureIds) {
+                    this.capturedIds.add(elem.value);
+                  }
+                  elem.type = NodeTypeEnum.String;
+                }
+                if (elem.type === NodeTypeEnum.List) {
+                  elem = elem.node;
+                }
+                this.generateBytecode(elem, false, captureIds);
+              } else {
+                this.generateBytecode(elem, false, captureIds);
+              }
+              if (index >= 1 && elem.type !== NodeTypeEnum.FunctionCall) {
+                this.generatedNodes.push(this.newNode(NodeTypeEnum.Accessor));
+              }
+            });
+            var lastElem = flattened.at(-1);
+            if (lastElem.type === NodeTypeEnum.ID) {
+              if (captureIds) {
+                this.capturedIds.add(lastElem.value);
+              }
+              lastElem.type = NodeTypeEnum.String;
+            }
+            if (lastElem.type === NodeTypeEnum.List) {
+              lastElem = lastElem.node;
+            }
+            this.generateBytecode(node.right, false, captureIds);
+            this.generateBytecode(lastElem, false, captureIds);
+            this.generatedNodes.push(this.newNode(NodeTypeEnum.ModifyProperty));
+            if (pop) {
+              this.generatedNodes.push(this.newNode(NodeTypeEnum.Pop));
+            }
+            return;
           }
-          this.generateBytecode(node.right, false, captureIds);
-          this.generateBytecode(lastElem, false, captureIds);
-          this.generatedNodes.push(this.newNode(NodeTypeEnum.ModifyProperty));
-          if (pop) {
-            this.generatedNodes.push(this.newNode(NodeTypeEnum.Pop));
-          }
-          return;
+          this.errorAndExit("Malformed assignment");
         }
         if (node.value === ".") {
           const flattened = this.flattenChildren(node, [
@@ -215,7 +267,7 @@ export class Generator {
                 elem = elem.node;
               } else if (elem.type === NodeTypeEnum.ID) {
                 if (captureIds) {
-                  this.capturedIds.push(elem.value);
+                  this.capturedIds.add(elem.value);
                 }
                 elem.type = NodeTypeEnum.String;
               }
@@ -247,7 +299,7 @@ export class Generator {
 
           if (node.right.type === NodeTypeEnum.ID) {
             if (captureIds) {
-              this.capturedIds.push(node.right.value);
+              this.capturedIds.add(node.right.value);
             }
             const fnCall = this.newNode(NodeTypeEnum.FunctionCall);
             fnCall.left = this.newNode(NodeTypeEnum.ID, node.right.value);
@@ -296,6 +348,22 @@ export class Generator {
           return;
         }
         if (node.value === "+=") {
+          if (node.left.type === NodeTypeEnum.ID) {
+            const variableIndex = this.variables.findIndex(
+              (e) => e.id === node.left.value
+            );
+            if (variableIndex >= 0) {
+              this.generateBytecode(node.right, false, captureIds);
+              this.generatedNodes.push(
+                this.newNode(NodeTypeEnum.AddAssign, variableIndex)
+              );
+              if (pop) {
+                this.generatedNodes.push(this.newNode(NodeTypeEnum.Pop));
+              }
+              return;
+            }
+          }
+
           const eq = this.newNode(NodeTypeEnum.Operator, "=");
           eq.left = node.left;
           const op = this.newNode(NodeTypeEnum.Operator, "+");
@@ -521,12 +589,36 @@ export class Generator {
         return;
       }
       case NodeTypeEnum.Decl: {
+        const variableIndices = [];
+        let variableIndex = 0;
         let isClass = false;
         if (node.declNode.id.type === NodeTypeEnum.Paren) {
           isClass = true;
           node.declNode.id = node.declNode.id.node;
         }
         if (node.declNode.id.type === NodeTypeEnum.ID) {
+          // Check if variable already defined
+          const symbol = this.variables.find(
+            (e) => e.id === node.declNode.id.value
+          );
+          if (symbol) {
+            if (!(node.value === "let" && symbol.type === "let")) {
+              this.errorAndExit(
+                `Variable '${node.declNode.id.value}' cannot be re-declared`
+              );
+            }
+            const symbolIndex = this.variables.findIndex(
+              (e) => e.id === node.declNode.id.value
+            );
+            variableIndex = symbolIndex;
+          } else {
+            variableIndex = this.variables.length;
+            this.variableMap[node.declNode.id.value] = this.variables.length;
+            this.variables.push({
+              id: node.declNode.id.value,
+              type: node.value,
+            });
+          }
           this.generatedNodes.push(
             this.newNode(NodeTypeEnum.String, node.declNode.id.value)
           );
@@ -542,6 +634,19 @@ export class Generator {
                 "Destructured declarations need to be identifiers"
               );
             }
+            // Check if variable already defined
+            const symbol = this.variables.find((e) => e.id === elem.value);
+            if (symbol) {
+              if (!(node.value === "let" && symbol.type === "let")) {
+                this.errorAndExit(
+                  `Variable '${elem.value}' cannot be re-declared`
+                );
+              }
+            } else {
+              this.variableMap[elem.value] = this.variables.length;
+              this.variables.push({ id: elem.value, type: node.value });
+            }
+            variableIndices.push(this.variables.length - 1);
             return this.newNode(NodeTypeEnum.String, elem.value);
           });
           this.generateBytecode(destructuredList, false, false);
@@ -563,6 +668,19 @@ export class Generator {
                 "Destructured declarations need to be identifiers"
               );
             }
+            // Check if variable already defined
+            const symbol = this.variables.find((e) => e.id === elem.value);
+            if (symbol) {
+              if (!(node.value === "let" && symbol.type === "let")) {
+                this.errorAndExit(
+                  `Variable '${elem.value}' cannot be re-declared`
+                );
+              }
+            } else {
+              this.variableMap[elem.value] = this.variables.length;
+              this.variables.push({ id: elem.value, type: node.value });
+            }
+            variableIndices.push(this.variables.length - 1);
             return this.newNode(NodeTypeEnum.String, elem.value);
           });
           this.generateBytecode(destructuredList, false, captureIds);
@@ -571,7 +689,11 @@ export class Generator {
         this.generateBytecode(node.declNode.value, false, captureIds);
         this.generatedNodes.push({
           ...node,
-          declNode: { isClass },
+          declNode: {
+            isClass,
+            variableIndex: variableIndex,
+            variableIndices,
+          },
         });
         if (pop) {
           this.generatedNodes.push(this.newNode(NodeTypeEnum.Pop));
@@ -612,11 +734,31 @@ export class Generator {
         if (node.left) {
           if (node.left.type === NodeTypeEnum.ID) {
             if (captureIds) {
-              this.capturedIds.push(node.left.value);
+              this.capturedIds.add(node.left.value);
             }
-            this.generatedNodes.push(
-              this.newNode(NodeTypeEnum.String, node.left.value)
+            const fnIdString = this.newNode(
+              NodeTypeEnum.String,
+              node.left.value
             );
+            fnIdString.index = this.variables.findIndex(
+              (e) => e.id === node.left.value
+            );
+            if (fnIdString.index == -1) {
+              fnIdString.index = this.tempVariables.findIndex(
+                (e) => e.id === node.left.value
+              );
+              if (fnIdString.index >= 0) {
+                this.generatedNodes.push(
+                  this.newNode(NodeTypeEnum.LoadTemp, fnIdString.index)
+                );
+              } else {
+                this.generatedNodes.push(fnIdString);
+              }
+            } else {
+              this.generatedNodes.push(fnIdString);
+            }
+            // todo: change these to Load bytecode
+            // this.generatedNodes.push(fnIdString);
           } else {
             this.generateBytecode(node.left, false, captureIds);
           }
@@ -633,6 +775,7 @@ export class Generator {
         return node;
       }
       case NodeTypeEnum.ForStatement: {
+        const tempVarIndices = [];
         const loopStart = this.newNode(NodeTypeEnum.StartForLoop);
         loopStart.value = 0;
         loopStart.forLoopStartNode = {
@@ -650,14 +793,20 @@ export class Generator {
           if (valueName.type !== NodeTypeEnum.ID) {
             this.errorAndExit("For loop variable name must be of type ID");
           }
+          tempVarIndices.push(tempVarIndices.length);
+          this.tempVariables.push({ id: valueName.value, type: "let" });
           loopStart.forLoopStartNode.valueName = valueName.value;
+          loopStart.forLoopStartNode.valueIndex = this.tempVariables.length - 1;
         }
         if (forLoopSections.length > 2) {
           const indexName = forLoopSections[2];
           if (indexName.type !== NodeTypeEnum.ID) {
             this.errorAndExit("For loop index name must be of type ID");
           }
+          tempVarIndices.push(tempVarIndices.length);
+          this.tempVariables.push({ id: indexName.value, type: "let" });
           loopStart.forLoopStartNode.indexName = indexName.value;
+          loopStart.forLoopStartNode.indexIndex = this.tempVariables.length - 1;
         }
         this.generateBytecode(forLoopSections[0], false, captureIds);
         this.generatedNodes.push(loopStart);
@@ -670,6 +819,10 @@ export class Generator {
           value: loopStartIndex,
         });
         loopStart.forLoopStartNode.endIndex = this.generatedNodes.length - 1;
+        this.tempVariables = this.tempVariables.slice(
+          0,
+          -tempVarIndices.length
+        );
         return;
       }
       case NodeTypeEnum.WhileStatement: {
@@ -738,7 +891,7 @@ export class Generator {
             e.left = this.newNode(NodeTypeEnum.String, e.value);
             e.right = this.newNode(NodeTypeEnum.ID, e.value);
             if (captureIds) {
-              this.capturedIds.push(e.value);
+              this.capturedIds.add(e.value);
             }
             e.type = NodeTypeEnum.Operator;
             e.value = ":";
@@ -753,8 +906,7 @@ export class Generator {
               this.newNode(NodeTypeEnum.String, e.left.value)
             );
           } else if (e.left.type === NodeTypeEnum.List) {
-            e.left.node = this.newNode(NodeTypeEnum.String, e.left.node.value);
-            this.generateBytecode(e.left, false, captureIds);
+            this.generateBytecode(e.left.node, false, true);
           }
           this.generateBytecode(e.right, false, captureIds);
         });
@@ -777,10 +929,11 @@ export class Generator {
           node.right.type === NodeTypeEnum.Block
             ? node.right.nodes
             : [node.right];
+        const generator = new Generator(nodes, this.filePath);
         const params = this.flattenChildren(node.left.node, [","]);
         var isDefault = false;
         var isCatchAll = false;
-        params.forEach((param) => {
+        params.forEach((param, index) => {
           if (param.type === NodeTypeEnum.Operator && param.value === "=") {
             if (isCatchAll) {
               this.errorAndExit(
@@ -791,6 +944,11 @@ export class Generator {
             this.generatedNodes.push(
               this.newNode(NodeTypeEnum.String, param.left.value)
             );
+
+            const variableIndex = generator.variables.length;
+            generator.variableMap[param.left.value] = variableIndex;
+            generator.variables.push({ id: param.left.value, type: "let" });
+
             this.generateBytecode(param.right, false, captureIds);
             this.generatedNodes.push(this.newNode(NodeTypeEnum.DefaultParam));
           } else {
@@ -810,6 +968,10 @@ export class Generator {
               const catchAllParam = this.newNode(NodeTypeEnum.CatchAllParam);
               catchAllParam.value = param.right.value;
               this.generatedNodes.push(catchAllParam);
+
+              const variableIndex = generator.variables.length;
+              generator.variableMap[param.right.value] = variableIndex;
+              generator.variables.push({ id: param.right.value, type: "let" });
             } else {
               if (isCatchAll) {
                 this.errorAndExit(
@@ -819,10 +981,14 @@ export class Generator {
               this.generatedNodes.push(
                 this.newNode(NodeTypeEnum.String, param.value)
               );
+
+              const variableIndex = generator.variables.length;
+              generator.variableMap[param.value] = variableIndex;
+              generator.variables.push({ id: param.value, type: "let" });
             }
           }
         });
-        const generator = new Generator(nodes, this.filePath);
+        // const generator = new Generator(nodes, this.filePath);
         const fnByteCode = generator.generate(true);
 
         if (fnByteCode.at(-1)?.type === NodeTypeEnum.Pop) {
@@ -835,6 +1001,7 @@ export class Generator {
           originFilePath: this.filePath,
           closures: {},
           isCoroutine: generator.isCoroutine,
+          variableMap: generator.variableMap,
         };
         fnNode.meta = {
           capturedIds: generator.capturedIds,

@@ -347,7 +347,7 @@ export class Parser {
         this.advance();
         this.nodes[parenIndex].nodes = [];
         this.nodes[parenIndex].meta = {
-          capturedIds: [],
+          capturedIds: new Set<string>(),
         };
         while (true) {
           if (
@@ -669,7 +669,8 @@ export class Parser {
         if (
           ((this.node.type === NodeTypeEnum.ID &&
             this.node.value !== "const" &&
-            this.node.value !== "var") ||
+            this.node.value !== "var" &&
+            this.node.value !== "let") ||
             this.node.type === NodeTypeEnum.Break ||
             this.node.type === NodeTypeEnum.FunctionCall ||
             this.node.type === NodeTypeEnum.Accessor ||

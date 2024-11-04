@@ -29,6 +29,9 @@ const generator = new Generator(parser.nodes, parser.filePath);
 generator.generate();
 
 const vm = new VM(generator.generatedNodes, parser.filePath);
+vm.variables = generator.variables;
+vm.tempVariables = generator.tempVariables;
+vm.variableMap = generator.variableMap;
 vm.functionName = "main";
 
 const commonPath = debug
@@ -54,24 +57,33 @@ try {
     configParser.nodes,
     configParser.filePath
   );
+
   configGenerator.generate();
 
   const configVM = new VM(
     configGenerator.generatedNodes,
     configParser.filePath
   );
+
+  configVM.variables = configGenerator.variables;
+  configVM.tempVariables = configGenerator.tempVariables;
+  configVM.variableMap = configGenerator.variableMap;
+
   configVM.evaluate();
-  for (const key of Object.keys(configVM.symbols.globals?.node?.value ?? {})) {
+
+  const globals = configVM.symbolsArray[configVM.variableMap.globals];
+  const operators = configVM.symbolsArray[configVM.variableMap.operators];
+
+  for (const key of Object.keys(globals?.node?.value ?? {})) {
     vm.symbols[key] = {
-      node: configVM.symbols.globals.node.value[key],
+      node: globals.node.value[key],
       const: true,
       isGlobal: true,
     };
   }
-  for (const key of Object.keys(
-    configVM.symbols.operators?.node?.value ?? {}
-  )) {
-    const operation = configVM.symbols.operators.node.value[key];
+
+  for (const key of Object.keys(operators?.node?.value ?? {})) {
+    const operation = operators.node.value[key];
     if (operation.funcNode.params?.length == 1) {
       vm.operators[`unary${key}`] = operation;
     } else {
@@ -81,8 +93,9 @@ try {
 
   const moduleObject = configParser.newNode(NodeTypeEnum.Object, {});
   moduleObject.evaluated = true;
-  Object.keys(configVM.symbols).forEach((key) => {
-    moduleObject.value[key] = configVM.symbols[key].node;
+  Object.entries(configVM.variableMap).forEach(([name, index]) => {
+    const symbol = configVM.symbolsArray[index];
+    moduleObject.value[name] = symbol.node;
   });
   vm.symbols.__config = { node: moduleObject, const: false, isGlobal: true };
 } catch (e) {}

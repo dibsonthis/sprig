@@ -1374,14 +1374,6 @@ export class VM {
       return this.newNode();
     }
 
-    // Symbol array - experimental
-
-    const _existingSymbol = this.symbolsArray[node.declNode.variableIndex];
-    // todo: move this compile time
-    if (_existingSymbol && node.value !== "let") {
-      return this.newError(`Variable '${id.value}' is already defined`);
-    }
-
     if (value.type === NodeTypeEnum.Function && !value.funcNode?.name) {
       value.funcNode.name = id.value;
     }
@@ -1397,41 +1389,6 @@ export class VM {
     };
 
     return value;
-
-    // --- //
-
-    // const existingSymbol = this.symbols[id.value];
-
-    // if (existingSymbol && this.symbols.hasOwnProperty(id.value)) {
-    //   if (
-    //     !(existingSymbol.canChange && node.value === "let") &&
-    //     !this.capturedIds.includes(id.value)
-    //   ) {
-    //     return this.newError(`Variable '${id.value}' is already defined`);
-    //   }
-    // }
-
-    // if (value.type === NodeTypeEnum.ID) {
-    //   value = this.evaluateID(value);
-    //   if (value.type === NodeTypeEnum.Error) {
-    //     return value;
-    //   }
-    // }
-
-    // if (value.type === NodeTypeEnum.Function && !value.funcNode?.name) {
-    //   value.funcNode.name = id.value;
-    // }
-
-    // if (node?.declNode?.isClass) {
-    //   value.class = id;
-    // }
-
-    // this.symbols[id.value] = {
-    //   node: value,
-    //   const: node.value === "const",
-    //   canChange: node.value === "let",
-    // };
-    // return value;
   }
 
   private evaluateFunctionCall(node: Node, isMethod = false) {
@@ -2651,10 +2608,14 @@ export class VM {
           left.type === NodeTypeEnum.List &&
           right.type === NodeTypeEnum.List
         ) {
-          this.symbolsArray[node.value].node = this.newNode(NodeTypeEnum.List);
+          this.symbolsArray[node.value].node = this.newNode(
+            NodeTypeEnum.List,
+            undefined,
+            true
+          );
           this.symbolsArray[node.value].node.nodes = [
-            ...left.nodes,
-            ...right.nodes,
+            ...left?.nodes,
+            ...right?.nodes,
           ];
           return this.symbolsArray[node.value].node;
         }

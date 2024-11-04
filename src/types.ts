@@ -162,6 +162,7 @@ export enum NodeTypeEnum {
   Load,
   LoadSymbol,
   Store,
+  AddAssign,
 }
 
 export const NodeTypes = [

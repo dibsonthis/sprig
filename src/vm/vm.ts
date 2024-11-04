@@ -2152,9 +2152,9 @@ export class VM {
 
         for (let i = 0; i < node.value; i++) {
           const name = this.stack.pop();
-          if (vm.symbols[name.value]) {
+          if (vm.variableMap[name.value] !== undefined) {
             this.symbols[name.value] = {
-              node: vm.symbols[name.value].node,
+              node: vm.symbolsArray[vm.variableMap[name.value]].node,
               const: false,
             };
           } else {
@@ -2617,9 +2617,65 @@ export class VM {
         return this.newError(`Variable '${name}' is undefined`);
       }
       case NodeTypeEnum.Store: {
-        var value = this.stack.pop();
+        const value = this.stack.pop();
         this.symbolsArray[node.value].node = value;
         return value;
+      }
+      case NodeTypeEnum.AddAssign: {
+        const right = this.stack.pop();
+        const left = this.symbolsArray[node.value].node;
+        // TODO: replace with function
+        if (
+          left.type === NodeTypeEnum.Number &&
+          right.type === NodeTypeEnum.Number
+        ) {
+          this.symbolsArray[node.value].node = this.newNode(
+            NodeTypeEnum.Number,
+            left.value + right.value
+          );
+          return this.symbolsArray[node.value].node;
+        }
+
+        if (
+          left.type === NodeTypeEnum.String &&
+          right.type === NodeTypeEnum.String
+        ) {
+          this.symbolsArray[node.value].node = this.newNode(
+            NodeTypeEnum.Number,
+            left.value + right.value
+          );
+          return this.symbolsArray[node.value].node;
+        }
+
+        if (
+          left.type === NodeTypeEnum.List &&
+          right.type === NodeTypeEnum.List
+        ) {
+          this.symbolsArray[node.value].node = this.newNode(NodeTypeEnum.List);
+          this.symbolsArray[node.value].node.nodes = [
+            ...left.nodes,
+            ...right.nodes,
+          ];
+          return this.symbolsArray[node.value].node;
+        }
+
+        if (
+          left.type === NodeTypeEnum.Object &&
+          right.type === NodeTypeEnum.Object
+        ) {
+          const newObject = this.newNode(NodeTypeEnum.Object);
+          newObject.evaluated = true;
+          newObject.value = { ...left?.value, ...right?.value };
+          if (left.handler || right.handler) {
+            const newHandler = this.newNode(NodeTypeEnum.Object, {
+              ...(left.handler?.value ?? {}),
+              ...(right.handler?.value ?? {}),
+            });
+            newObject.handler = newHandler;
+          }
+          this.symbolsArray[node.value].node = newObject;
+          return this.symbolsArray[node.value].node;
+        }
       }
       default: {
         return this.newNode();

@@ -145,10 +145,6 @@ export class Generator {
           this.generatedNodes.push(
             this.newNode(NodeTypeEnum.Load, variableIndex)
           );
-          // this.generatedNodes.push({
-          //   ...node,
-          //   index: variableIndex,
-          // });
           if (pop) {
             this.generatedNodes.push(this.newNode(NodeTypeEnum.Pop));
           }
@@ -352,6 +348,22 @@ export class Generator {
           return;
         }
         if (node.value === "+=") {
+          if (node.left.type === NodeTypeEnum.ID) {
+            const variableIndex = this.variables.findIndex(
+              (e) => e.id === node.left.value
+            );
+            if (variableIndex >= 0) {
+              this.generateBytecode(node.right, false, captureIds);
+              this.generatedNodes.push(
+                this.newNode(NodeTypeEnum.AddAssign, variableIndex)
+              );
+              if (pop) {
+                this.generatedNodes.push(this.newNode(NodeTypeEnum.Pop));
+              }
+              return;
+            }
+          }
+
           const eq = this.newNode(NodeTypeEnum.Operator, "=");
           eq.left = node.left;
           const op = this.newNode(NodeTypeEnum.Operator, "+");

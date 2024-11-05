@@ -220,6 +220,33 @@ export const NodeTypes = [
 
 export type NodeType = (typeof NodeTypes)[number];
 
+export type NodeArray = {
+  id?: string;
+  node: Node;
+  const: boolean;
+  canChange?: boolean;
+  isGlobal?: boolean;
+  isClosure?: boolean;
+}[];
+
+export type CallFrame = {
+  name?: string;
+  filePath: string;
+  parentFrame?: CallFrame;
+  capturedIds?: Set<string>;
+  stack: Node[];
+  instructions: Node[];
+  instruction: Node;
+  index: number;
+  symbols: SymbolTable;
+  symbolsArray: NodeArray;
+  tempVarsArray: NodeArray;
+  variables: { id: string; type: string }[];
+  tempVariables: { id: string; type: string }[];
+  variableMap: Record<string, number>;
+  tempVars: SymbolTable;
+};
+
 export type SymbolTable = Record<
   string,
   {

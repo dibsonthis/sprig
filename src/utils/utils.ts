@@ -106,29 +106,33 @@ export const injectCommonAndModules = (
       commonParser.filePath
     );
 
-    commonVM.variableMap = commonGenerator.variableMap;
-    commonVM.variables = commonGenerator.variables;
-    commonVM.tempVariables = commonGenerator.tempVariables;
+    commonVM.callFrame.variableMap = commonGenerator.variableMap;
+    commonVM.callFrame.variables = commonGenerator.variables;
+    commonVM.callFrame.tempVariables = commonGenerator.tempVariables;
 
     commonVM.evaluate();
 
-    Object.keys(commonVM.variableMap).forEach((k) => {
-      const index = commonVM.variableMap[k];
-      const symbol = commonVM.symbolsArray[index];
+    Object.keys(commonVM.callFrame.variableMap).forEach((k) => {
+      const index = commonVM.callFrame.variableMap[k];
+      const symbol = commonVM.callFrame.symbolsArray[index];
       symbol.isGlobal = true;
-      vm.symbols[k] = symbol;
+      vm.callFrame.symbols[k] = symbol;
     });
 
     const moduleObject = commonParser.newNode(NodeTypeEnum.Object, {});
     moduleObject.evaluated = true;
-    Object.keys(commonVM.symbols).forEach((key) => {
-      moduleObject.value[key] = commonVM.symbols[key].node;
+    Object.keys(commonVM.callFrame.symbols).forEach((key) => {
+      moduleObject.value[key] = commonVM.callFrame.symbols[key].node;
     });
-    Object.keys(commonVM.variableMap).forEach((key) => {
-      const index = commonVM.variableMap[key];
-      moduleObject.value[key] = commonVM.symbolsArray[index].node;
+    Object.keys(commonVM.callFrame.variableMap).forEach((key) => {
+      const index = commonVM.callFrame.variableMap[key];
+      moduleObject.value[key] = commonVM.callFrame.symbolsArray[index].node;
     });
-    vm.symbols.__common = { node: moduleObject, const: false, isGlobal: true };
+    vm.callFrame.symbols.__common = {
+      node: moduleObject,
+      const: false,
+      isGlobal: true,
+    };
   } catch (e) {
     console.warn(
       "Warning: File not found: 'common.sp' - common functions have not been imported"
@@ -175,14 +179,14 @@ export const injectCommonAndModules = (
         moduleParser.filePath
       );
 
-      moduleVM.variableMap = moduleGenerator.variableMap;
-      moduleVM.variables = moduleGenerator.variables;
-      moduleVM.tempVariables = moduleGenerator.tempVariables;
+      moduleVM.callFrame.variableMap = moduleGenerator.variableMap;
+      moduleVM.callFrame.variables = moduleGenerator.variables;
+      moduleVM.callFrame.tempVariables = moduleGenerator.tempVariables;
 
-      Object.keys(vm.symbols).forEach((key) => {
-        const symbol = vm.symbols[key];
+      Object.keys(vm.callFrame.symbols).forEach((key) => {
+        const symbol = vm.callFrame.symbols[key];
         if (symbol.isGlobal) {
-          moduleVM.symbols[key] = symbol;
+          moduleVM.callFrame.symbols[key] = symbol;
         }
       });
 
@@ -194,9 +198,9 @@ export const injectCommonAndModules = (
 
       const moduleObject = moduleParser.newNode(NodeTypeEnum.Object, {});
       moduleObject.evaluated = true;
-      Object.keys(moduleVM.variableMap).forEach((key) => {
-        const index = moduleVM.variableMap[key];
-        const symbol = moduleVM.symbolsArray[index];
+      Object.keys(moduleVM.callFrame.variableMap).forEach((key) => {
+        const index = moduleVM.callFrame.variableMap[key];
+        const symbol = moduleVM.callFrame.symbolsArray[index];
         moduleObject.value[key] = {
           ...symbol.node,
           meta: { hiddenProp: symbol.isGlobal },
@@ -208,14 +212,14 @@ export const injectCommonAndModules = (
       //     meta: { hiddenProp: moduleVM.symbols[key].isGlobal },
       //   };
       // });
-      vm.symbols[moduleNameMap[moduleName]] = {
+      vm.callFrame.symbols[moduleNameMap[moduleName]] = {
         node: moduleObject,
         const: false,
         isGlobal: true,
       };
 
-      vm.symbols.__common.node.value[moduleNameMap[moduleName]] =
-        vm.symbols[moduleNameMap[moduleName]].node;
+      vm.callFrame.symbols.__common.node.value[moduleNameMap[moduleName]] =
+        vm.callFrame.symbols[moduleNameMap[moduleName]].node;
     });
   } catch (e) {
     console.warn("Warning: Encountered an error while loading builtin modules");

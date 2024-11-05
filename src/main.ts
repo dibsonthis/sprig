@@ -29,10 +29,10 @@ const generator = new Generator(parser.nodes, parser.filePath);
 generator.generate();
 
 const vm = new VM(generator.generatedNodes, parser.filePath);
-vm.variables = generator.variables;
-vm.tempVariables = generator.tempVariables;
-vm.variableMap = generator.variableMap;
-vm.functionName = "main";
+vm.callFrame.variables = generator.variables;
+vm.callFrame.tempVariables = generator.tempVariables;
+vm.callFrame.variableMap = generator.variableMap;
+vm.callFrame.name = "main";
 
 const commonPath = debug
   ? path.resolve("common.sp")
@@ -40,64 +40,64 @@ const commonPath = debug
 
 const modulesPath = path.join(__dirname, "modules");
 
-injectCommonAndModules(vm, commonPath, modulesPath);
+// injectCommonAndModules(vm, commonPath, modulesPath);
 
 process.chdir(path.dirname(filePath));
 
-// Config
-try {
-  const config = fs.readFileSync("./config.sp");
-  const configLexer = new Lexer(config.toString(), true);
-  configLexer.tokenize();
+// // Config
+// try {
+//   const config = fs.readFileSync("./config.sp");
+//   const configLexer = new Lexer(config.toString(), true);
+//   configLexer.tokenize();
 
-  const configParser = new Parser(configLexer.nodes, configLexer.filePath);
-  configParser.parse();
+//   const configParser = new Parser(configLexer.nodes, configLexer.filePath);
+//   configParser.parse();
 
-  const configGenerator = new Generator(
-    configParser.nodes,
-    configParser.filePath
-  );
+//   const configGenerator = new Generator(
+//     configParser.nodes,
+//     configParser.filePath
+//   );
 
-  configGenerator.generate();
+//   configGenerator.generate();
 
-  const configVM = new VM(
-    configGenerator.generatedNodes,
-    configParser.filePath
-  );
+//   const configVM = new VM(
+//     configGenerator.generatedNodes,
+//     configParser.filePath
+//   );
 
-  configVM.variables = configGenerator.variables;
-  configVM.tempVariables = configGenerator.tempVariables;
-  configVM.variableMap = configGenerator.variableMap;
+//   configVM.variables = configGenerator.variables;
+//   configVM.tempVariables = configGenerator.tempVariables;
+//   configVM.variableMap = configGenerator.variableMap;
 
-  configVM.evaluate();
+//   configVM.evaluate();
 
-  const globals = configVM.symbolsArray[configVM.variableMap.globals];
-  const operators = configVM.symbolsArray[configVM.variableMap.operators];
+//   const globals = configVM.symbolsArray[configVM.variableMap.globals];
+//   const operators = configVM.symbolsArray[configVM.variableMap.operators];
 
-  for (const key of Object.keys(globals?.node?.value ?? {})) {
-    vm.symbols[key] = {
-      node: globals.node.value[key],
-      const: true,
-      isGlobal: true,
-    };
-  }
+//   for (const key of Object.keys(globals?.node?.value ?? {})) {
+//     vm.symbols[key] = {
+//       node: globals.node.value[key],
+//       const: true,
+//       isGlobal: true,
+//     };
+//   }
 
-  for (const key of Object.keys(operators?.node?.value ?? {})) {
-    const operation = operators.node.value[key];
-    if (operation.funcNode.params?.length == 1) {
-      vm.operators[`unary${key}`] = operation;
-    } else {
-      vm.operators[key] = operation;
-    }
-  }
+//   for (const key of Object.keys(operators?.node?.value ?? {})) {
+//     const operation = operators.node.value[key];
+//     if (operation.funcNode.params?.length == 1) {
+//       vm.operators[`unary${key}`] = operation;
+//     } else {
+//       vm.operators[key] = operation;
+//     }
+//   }
 
-  const moduleObject = configParser.newNode(NodeTypeEnum.Object, {});
-  moduleObject.evaluated = true;
-  Object.entries(configVM.variableMap).forEach(([name, index]) => {
-    const symbol = configVM.symbolsArray[index];
-    moduleObject.value[name] = symbol.node;
-  });
-  vm.symbols.__config = { node: moduleObject, const: false, isGlobal: true };
-} catch (e) {}
+//   const moduleObject = configParser.newNode(NodeTypeEnum.Object, {});
+//   moduleObject.evaluated = true;
+//   Object.entries(configVM.variableMap).forEach(([name, index]) => {
+//     const symbol = configVM.symbolsArray[index];
+//     moduleObject.value[name] = symbol.node;
+//   });
+//   vm.symbols.__config = { node: moduleObject, const: false, isGlobal: true };
+// } catch (e) {}
 
 vm.evaluate();

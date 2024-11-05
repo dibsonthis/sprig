@@ -1,37 +1,31 @@
-import { Node, SymbolTable, NodeTypeEnum } from "../types";
+import { Node, SymbolTable, NodeTypeEnum, CallFrame } from "../types";
 import { Lexer } from "../lexer/lexer";
 import { Parser } from "../parser/parser";
 import { Generator } from "../generator/generator";
 import { getParamNames } from "../utils/utils";
 import path from "path";
 
+const newCallFrame = (instructions = []): CallFrame => {
+  return {
+    filePath: "",
+    stack: [],
+    instructions,
+    instruction: undefined,
+    index: -1,
+    symbols: {},
+    symbolsArray: [],
+    tempVarsArray: [],
+    variables: [],
+    tempVariables: [],
+    variableMap: {},
+    tempVars: {},
+    capturedIds: new Set<string>(),
+  };
+};
+
 export class VM {
-  private nodes: Node[];
-  private node: Node;
-  private stack: Node[] = [];
-  private index: number = 0;
-
-  public symbols: SymbolTable = {};
-  public symbolsArray: {
-    node: Node;
-    const: boolean;
-    canChange?: boolean;
-    isGlobal?: boolean;
-    isClosure?: boolean;
-  }[] = [];
-  tempVarsArray: {
-    id?: string;
-    node: Node;
-    const: boolean;
-    canChange?: boolean;
-    isGlobal?: boolean;
-    isClosure?: boolean;
-  }[] = [];
-  public tempVars: SymbolTable = {};
-
-  public variables: { id: string; type: string }[] = [];
-  public tempVariables: { id: string; type: string }[] = [];
-  public variableMap: Record<string, number> = {};
+  public callFrame: CallFrame = newCallFrame();
+  public callFrames: CallFrame[] = [this.callFrame];
 
   public operators: Record<string, Node> = {};
   public cachedImports = {};
@@ -39,19 +33,16 @@ export class VM {
   public functionName: string;
   public meta: object = {};
 
-  public capturedIds = new Set<string>();
-
   // flags
   public injectBuiltins: boolean;
-
   public parentVM: VM;
 
   private errorAndContinue(message: string, node?: Node) {
-    const errorNode = node ? node : this.node;
-    const resolved = path.resolve(this.filePath);
+    const errorNode = node ? node : this.callFrame.instruction;
+    const resolved = path.resolve(this.callFrame.filePath);
     console.error(
       "\x1b[31m%s\x1b[0m",
-      `Error in '${this.functionName}' (${resolved}:${errorNode.line}:${errorNode.col}): ${message}`
+      `Error in '${this.callFrame.name}' (${resolved}:${errorNode.line}:${errorNode.col}): ${message}`
     );
   }
 
@@ -61,9 +52,14 @@ export class VM {
   }
 
   constructor(nodes: Node[], filePath: string = ".", restricted = false) {
-    this.nodes = nodes;
-    this.node = this.nodes[0];
     this.filePath = filePath;
+    this.callFrame.instructions = nodes;
+    this.callFrame.instruction = nodes[0];
+    this.callFrame.index = 0;
+    this.callFrame.name = filePath;
+    this.callFrame.filePath = filePath;
+
+    global._vm = this;
 
     if (restricted) {
       const vm = require("vm");
@@ -103,8 +99,9 @@ export class VM {
   }
 
   private advance() {
-    this.index += 1;
-    this.node = this.nodes[this.index];
+    this.callFrame.index++;
+    this.callFrame.instruction =
+      this.callFrame.instructions[this.callFrame.index];
   }
 
   private newNode(
@@ -113,8 +110,8 @@ export class VM {
     evaluated = false
   ): Node {
     return {
-      col: this.node?.col ?? 0,
-      line: this.node?.line ?? 0,
+      col: this.callFrame.instruction?.col ?? 0,
+      line: this.callFrame.instruction?.line ?? 0,
       type,
       value,
       evaluated,
@@ -124,37 +121,15 @@ export class VM {
   private newError = (message: string): Node => ({
     type: NodeTypeEnum.Error,
     value: message,
-    line: this.node?.line ?? 0,
-    col: this.node?.col ?? 0,
+    line: this.callFrame.instruction?.line ?? 0,
+    col: this.callFrame.instruction?.col ?? 0,
     evaluated: true,
   });
 
   public back() {
-    this.index -= 1;
-    this.node = this.nodes[this.index];
-  }
-
-  private nextNode() {
-    return this.nodes[this.index + 1];
-  }
-
-  private previousNode() {
-    return this.nodes[this.index - 1];
-  }
-
-  private removeNext() {
-    this.nodes.splice(this.index + 1, 1);
-  }
-
-  private removeCurrent() {
-    this.nodes.splice(this.index, 1);
-    this.node = this.nodes[this.index];
-  }
-
-  private removePrevious() {
-    this.nodes.splice(this.index - 1, 1);
-    this.index -= 1;
-    this.node = this.nodes[this.index];
+    this.callFrame.index -= 1;
+    this.callFrame.instruction =
+      this.callFrame.instructions[this.callFrame.index];
   }
 
   private toString(node: Node): string {
@@ -417,80 +392,73 @@ export class VM {
     return this.newNode();
   }
 
-  private eval(str: string, env?: Node): Node {
+  private eval(str: string, env?: Node) {
     const lexer = new Lexer(str, true);
     lexer.tokenize();
     const parser = new Parser(lexer.nodes, "eval");
     parser.parse();
     const generator = new Generator(parser.nodes, parser.filePath);
-    generator.variables = this.variables;
-    generator.tempVariables = this.tempVariables;
+    generator.variables = this.callFrame.variables;
+    generator.tempVariables = this.callFrame.tempVariables;
     generator.generate(true);
 
     if (generator.generatedNodes.at(-1)?.type === NodeTypeEnum.Pop) {
       generator.generatedNodes.pop();
     }
 
-    const vm = new VM(generator.generatedNodes, parser.filePath);
-    vm.capturedIds = generator.capturedIds;
-    this.capturedIds = new Set([...this.capturedIds, ...vm.capturedIds]);
+    const evalFrame = newCallFrame(generator.generatedNodes);
+    evalFrame.parentFrame = this.callFrame;
+    evalFrame.name = "eval";
+    evalFrame.capturedIds = generator.capturedIds;
+    evalFrame.capturedIds = new Set([
+      ...this.callFrame.capturedIds,
+      ...evalFrame.capturedIds,
+    ]);
 
     generator.capturedIds.forEach((id) => {
       const symbol = this.findSymbol_(id);
       if (symbol) {
-        vm.symbols[id] = symbol;
+        evalFrame.symbols[id] = symbol;
       } else {
         const closure = this.findClosure(id);
         if (closure) {
-          vm.symbols[id] = closure;
+          evalFrame.symbols[id] = closure;
         }
       }
     });
 
-    this.tempVarsArray.forEach((variable) => {
-      vm.symbols[variable.id] = variable;
+    this.callFrame.tempVarsArray.forEach((variable) => {
+      evalFrame.symbols[variable.id] = variable;
     });
-
-    vm.parentVM = this;
-    vm.functionName = "eval";
-    vm.builtins = this.builtins;
-    vm.meta = this.meta;
-    vm.injectBuiltins = this.injectBuiltins;
-
-    if (this.injectBuiltins) {
-      vm.builtins = {
-        ...this.builtins,
-        __vm: vm.builtins.__vm,
-        __builtins: vm.builtins.__builtins,
-        exec: vm.builtins.exec,
-        break: vm.builtins.break,
-      };
-    }
 
     if (env) {
       for (const prop in env.value) {
-        vm.symbols[prop] = { node: env.value[prop], const: false };
+        evalFrame.symbols[prop] = { node: env.value[prop], const: false };
       }
     } else {
-      vm.symbols = { ...this.symbols, ...vm.symbols };
-      vm.tempVars = this.tempVars;
-      vm.operators = this.operators;
-      vm.symbolsArray = this.symbolsArray;
+      evalFrame.symbols = {
+        ...this.callFrame.symbols,
+        ...evalFrame.symbols,
+      };
+      evalFrame.tempVars = this.callFrame.tempVars;
+      evalFrame.symbolsArray = this.callFrame.symbolsArray;
     }
 
-    return vm.evaluate();
+    this.advance();
+    this.callFrames.push(evalFrame);
+    this.callFrame = evalFrame;
   }
 
   public evaluateFunctionWithArgs(fn: Node, args: Node[]) {
     if (fn.type !== NodeTypeEnum.Function && fn.type !== NodeTypeEnum.Native) {
       return this.newNode();
     }
-    this.stack.push(this.newNode(NodeTypeEnum.FunctionCallBegin));
+    this.callFrame.stack.push(this.newNode(NodeTypeEnum.FunctionCallBegin));
     args.forEach((arg) => {
       arg.evaluated = true;
-      this.stack.push(arg);
+      this.callFrame.stack.push(arg);
     });
-    this.stack.push(fn);
+    this.callFrame.stack.push(fn);
     const functionCall = this.newNode(NodeTypeEnum.FunctionCall);
 
     return this.evaluateFunctionCall(functionCall);
@@ -543,8 +511,14 @@ export class VM {
       return this.newNode(
         NodeTypeEnum.Object,
         {
-          line: this.newNode(NodeTypeEnum.Number, vm.node?.line ?? 0),
-          col: this.newNode(NodeTypeEnum.Number, vm.node?.col ?? 0),
+          line: this.newNode(
+            NodeTypeEnum.Number,
+            vm.callFrame.instruction?.line ?? 0
+          ),
+          col: this.newNode(
+            NodeTypeEnum.Number,
+            vm.callFrame.instruction?.col ?? 0
+          ),
           filePath: this.newNode(NodeTypeEnum.String, vm.filePath),
           name: this.newNode(
             NodeTypeEnum.String,
@@ -859,25 +833,25 @@ export class VM {
     },
     closures: (args: Node[]) => {
       const symbolObject = this.newNode(NodeTypeEnum.Object, {}, true);
-      Object.keys(this.symbols).forEach((key) => {
-        const symbol = this.symbols[key];
+      Object.keys(this.callFrame.symbols).forEach((key) => {
+        const symbol = this.callFrame.symbols[key];
         !symbol?.isGlobal && (symbolObject.value[key] = symbol.node);
       });
       return symbolObject;
     },
     globals: (args: Node[]) => {
       const symbolObject = this.newNode(NodeTypeEnum.Object, {}, true);
-      Object.keys(this.symbols).forEach((key) => {
-        const symbol = this.symbols[key];
+      Object.keys(this.callFrame.symbols).forEach((key) => {
+        const symbol = this.callFrame.symbols[key];
         symbol?.isGlobal && (symbolObject.value[key] = symbol.node);
       });
       return symbolObject;
     },
     locals: (args: Node[]) => {
       const symbolObject = this.newNode(NodeTypeEnum.Object, {}, true);
-      Object.keys(this.variableMap).forEach((key) => {
-        const index = this.variableMap[key];
-        const symbol = this.symbolsArray[index];
+      Object.keys(this.callFrame.variableMap).forEach((key) => {
+        const index = this.callFrame.variableMap[key];
+        const symbol = this.callFrame.symbolsArray[index];
         symbol && (symbolObject.value[key] = symbol.node);
       });
       return symbolObject;
@@ -1040,9 +1014,9 @@ export class VM {
         if (fn.funcNode?.params.length == 2) {
           argsNode.nodes.push(this.newNode(NodeTypeEnum.Number, index));
         }
-        this.stack.push(this.newNode(NodeTypeEnum.FunctionCallBegin));
-        argsNode.nodes.forEach((node) => this.stack.push(node));
-        this.stack.push(fn);
+        this.callFrame.stack.push(this.newNode(NodeTypeEnum.FunctionCallBegin));
+        argsNode.nodes.forEach((node) => this.callFrame.stack.push(node));
+        this.callFrame.stack.push(fn);
         this.evaluateFunctionCall(fnCall);
       });
     },
@@ -1073,9 +1047,9 @@ export class VM {
         if (fn.funcNode?.params.length == 2) {
           argsNode.nodes.push(this.newNode(NodeTypeEnum.Number, index));
         }
-        this.stack.push(this.newNode(NodeTypeEnum.FunctionCallBegin));
-        argsNode.nodes.forEach((node) => this.stack.push(node));
-        this.stack.push(fn);
+        this.callFrame.stack.push(this.newNode(NodeTypeEnum.FunctionCallBegin));
+        argsNode.nodes.forEach((node) => this.callFrame.stack.push(node));
+        this.callFrame.stack.push(fn);
         return this.evaluateFunctionCall(fnCall);
       });
 
@@ -1108,9 +1082,9 @@ export class VM {
         if (fn.funcNode?.params.length == 2) {
           argsNode.nodes.push(this.newNode(NodeTypeEnum.Number, index));
         }
-        this.stack.push(this.newNode(NodeTypeEnum.FunctionCallBegin));
-        argsNode.nodes.forEach((node) => this.stack.push(node));
-        this.stack.push(fn);
+        this.callFrame.stack.push(this.newNode(NodeTypeEnum.FunctionCallBegin));
+        argsNode.nodes.forEach((node) => this.callFrame.stack.push(node));
+        this.callFrame.stack.push(fn);
         const res = this.evaluateFunctionCall(fnCall);
 
         const truthy =
@@ -1126,7 +1100,7 @@ export class VM {
   };
 
   private evaluateOperator(node: Node) {
-    var right = this.stack.pop();
+    var right = this.callFrame.stack.pop();
 
     const customOperation = this.operators[node.value];
     if (customOperation) {
@@ -1138,7 +1112,7 @@ export class VM {
         return this.evaluateFunctionWithArgs(customOperation, [right]);
       }
 
-      var left = this.stack.pop();
+      var left = this.callFrame.stack.pop();
 
       left.type === NodeTypeEnum.ID && (left = this.evaluateID(left));
       right.type === NodeTypeEnum.ID && (right = this.evaluateID(right));
@@ -1181,12 +1155,12 @@ export class VM {
   }
 
   private evaluateID(node: Node) {
-    const _symbol = this.symbolsArray[node.index];
+    const _symbol = this.callFrame.symbolsArray[node.index];
     return _symbol.node;
   }
 
   private resetLoops() {
-    for (const node of this.nodes) {
+    for (const node of this.callFrame.instructions) {
       if (node.type === NodeTypeEnum.StartForLoop) {
         node.forLoopStartNode.count = -1;
         node.forLoopStartNode.arr = undefined;
@@ -1196,22 +1170,26 @@ export class VM {
 
   private evaluateBreak(breakAll: boolean = false) {
     var loopCount = 1;
-    while (this.node) {
+    while (this.callFrame.instruction) {
       if (
-        this.node.type === NodeTypeEnum.StartForLoop ||
-        this.node.type === NodeTypeEnum.StartWhileLoop
+        this.callFrame.instruction.type === NodeTypeEnum.StartForLoop ||
+        this.callFrame.instruction.type === NodeTypeEnum.StartWhileLoop
       ) {
         loopCount++;
       } else if (
-        this.node.type === NodeTypeEnum.ForStatement ||
-        this.node.type === NodeTypeEnum.WhileStatement
+        this.callFrame.instruction.type === NodeTypeEnum.ForStatement ||
+        this.callFrame.instruction.type === NodeTypeEnum.WhileStatement
       ) {
         loopCount--;
         if (loopCount === 0) {
           // reset the start loop
-          if (this.node.type === NodeTypeEnum.ForStatement) {
-            this.nodes[this.node.value].forLoopStartNode.count = -1;
-            this.nodes[this.node.value].forLoopStartNode.arr = undefined;
+          if (this.callFrame.instruction.type === NodeTypeEnum.ForStatement) {
+            this.callFrame.instructions[
+              this.callFrame.instruction.value
+            ].forLoopStartNode.count = -1;
+            this.callFrame.instructions[
+              this.callFrame.instruction.value
+            ].forLoopStartNode.arr = undefined;
           }
           if (!breakAll) {
             break;
@@ -1223,29 +1201,34 @@ export class VM {
   }
 
   private evaluateBreakN(n = 1) {
-    const node = this.node;
+    const node = this.callFrame.instruction;
     var numberOfLoopsEncountered = 0;
     while (true) {
-      if (!this.node) {
+      if (!this.callFrame.instruction) {
         // We've gone too far back
         this.errorAndExit("Break count exceeds number of loops", node);
       }
       if (
-        this.node.type === NodeTypeEnum.StartForLoop ||
-        this.node.type === NodeTypeEnum.StartWhileLoop
+        this.callFrame.instruction.type === NodeTypeEnum.StartForLoop ||
+        this.callFrame.instruction.type === NodeTypeEnum.StartWhileLoop
       ) {
         numberOfLoopsEncountered++;
-        if (this.node.type === NodeTypeEnum.StartForLoop) {
-          this.node.forLoopStartNode.count = 0;
-          this.node.forLoopStartNode.arr = undefined;
+        if (this.callFrame.instruction.type === NodeTypeEnum.StartForLoop) {
+          this.callFrame.instruction.forLoopStartNode.count = 0;
+          this.callFrame.instruction.forLoopStartNode.arr = undefined;
         }
         if (numberOfLoopsEncountered === n) {
-          if (this.node.type === NodeTypeEnum.StartForLoop) {
-            this.index = this.node.forLoopStartNode.endIndex;
-            this.node = this.nodes[this.index];
-          } else if (this.node.type === NodeTypeEnum.StartWhileLoop) {
-            this.index = this.node.value;
-            this.node = this.nodes[this.index];
+          if (this.callFrame.instruction.type === NodeTypeEnum.StartForLoop) {
+            this.callFrame.index =
+              this.callFrame.instruction.forLoopStartNode.endIndex;
+            this.callFrame.instruction =
+              this.callFrame.instructions[this.callFrame.index];
+          } else if (
+            this.callFrame.instruction.type === NodeTypeEnum.StartWhileLoop
+          ) {
+            this.callFrame.index = this.callFrame.instruction.value;
+            this.callFrame.instruction =
+              this.callFrame.instructions[this.callFrame.index];
           }
           break;
         }
@@ -1259,7 +1242,7 @@ export class VM {
     node.forLoopStartNode.count++;
 
     if (!node.forLoopStartNode.arr) {
-      var arr = this.stack.pop();
+      var arr = this.callFrame.stack.pop();
       if (!arr) {
         this.errorAndExit("For loops must have a valid array");
       }
@@ -1283,27 +1266,28 @@ export class VM {
     if (node.forLoopStartNode.count >= node.forLoopStartNode.arr.length) {
       node.forLoopStartNode.count = -1;
       node.forLoopStartNode.arr = undefined;
-      this.index = node.forLoopStartNode.endIndex;
-      this.node = this.nodes[this.index];
+      this.callFrame.index = node.forLoopStartNode.endIndex;
+      this.callFrame.instruction =
+        this.callFrame.instructions[this.callFrame.index];
 
       if (node.forLoopStartNode.valueName) {
-        this.tempVarsArray.pop();
+        this.callFrame.tempVarsArray.pop();
       }
       if (node.forLoopStartNode.indexName) {
-        this.tempVarsArray.pop();
+        this.callFrame.tempVarsArray.pop();
       }
       return;
     }
 
     if (node.forLoopStartNode.valueName) {
-      this.tempVarsArray[node.forLoopStartNode.valueIndex] = {
+      this.callFrame.tempVarsArray[node.forLoopStartNode.valueIndex] = {
         id: node.forLoopStartNode.valueName,
         node: node.forLoopStartNode.arr[node.forLoopStartNode.count],
         const: false,
       };
     }
     if (node.forLoopStartNode.indexName) {
-      this.tempVarsArray[node.forLoopStartNode.indexIndex] = {
+      this.callFrame.tempVarsArray[node.forLoopStartNode.indexIndex] = {
         id: node.forLoopStartNode.indexName,
         node: this.newNode(NodeTypeEnum.Number, node.forLoopStartNode.count),
         const: false,
@@ -1312,8 +1296,8 @@ export class VM {
   }
 
   private evaluateDecl(node: Node) {
-    var value = this.stack.pop();
-    var id = this.stack.pop();
+    var value = this.callFrame.stack.pop();
+    var id = this.callFrame.stack.pop();
 
     if (!id) {
       return this.newError("Malformed declaration");
@@ -1329,8 +1313,10 @@ export class VM {
             declNode.declNode = {
               variableIndex: node.declNode.variableIndices[i],
             };
-            this.stack.push(this.newNode(NodeTypeEnum.ID, elem.value));
-            this.stack.push(valueNodes.shift() ?? this.newNode());
+            this.callFrame.stack.push(
+              this.newNode(NodeTypeEnum.ID, elem.value)
+            );
+            this.callFrame.stack.push(valueNodes.shift() ?? this.newNode());
             this.evaluateDecl(declNode);
           }
         });
@@ -1340,23 +1326,23 @@ export class VM {
           declNode.declNode = {
             variableIndex: node.declNode.variableIndices.at(-1),
           };
-          this.stack.push(
+          this.callFrame.stack.push(
             this.newNode(NodeTypeEnum.ID, id.nodes.at(-1)?.value)
           );
           const restList = this.newNode(NodeTypeEnum.List);
           restList.evaluated = true;
           restList.nodes = valueNodes;
-          this.stack.push(restList);
+          this.callFrame.stack.push(restList);
           this.evaluateDecl(declNode);
         } else {
           const declNode = this.newNode(NodeTypeEnum.Decl, node.value);
           declNode.declNode = {
             variableIndex: node.declNode.variableIndices.at(-1),
           };
-          this.stack.push(
+          this.callFrame.stack.push(
             this.newNode(NodeTypeEnum.ID, id.nodes.at(-1)?.value)
           );
-          this.stack.push(valueNodes[0] ?? this.newNode());
+          this.callFrame.stack.push(valueNodes[0] ?? this.newNode());
           this.evaluateDecl(declNode);
         }
       } else if (value.type === NodeTypeEnum.Object) {
@@ -1365,8 +1351,8 @@ export class VM {
           declNode.declNode = {
             variableIndex: node.declNode.variableIndices[i],
           };
-          this.stack.push(this.newNode(NodeTypeEnum.ID, elem.value));
-          this.stack.push(value.value[elem.value] ?? this.newNode());
+          this.callFrame.stack.push(this.newNode(NodeTypeEnum.ID, elem.value));
+          this.callFrame.stack.push(value.value[elem.value] ?? this.newNode());
           this.evaluateDecl(declNode);
         });
       }
@@ -1382,7 +1368,7 @@ export class VM {
       value.class = id;
     }
 
-    this.symbolsArray[node.declNode.variableIndex] = {
+    this.callFrame.symbolsArray[node.declNode.variableIndex] = {
       node: value,
       const: node.value === "const",
       canChange: node.value === "let",
@@ -1396,14 +1382,14 @@ export class VM {
     var fn;
 
     if (!isMethod) {
-      fn = this.stack.pop();
+      fn = this.callFrame.stack.pop();
     }
 
     const args = [];
     const namedArgs = {};
 
     while (true) {
-      const arg = this.stack.pop();
+      const arg = this.callFrame.stack.pop();
       if (arg.type === NodeTypeEnum.FunctionCallBegin) {
         break;
       }
@@ -1415,7 +1401,7 @@ export class VM {
     }
 
     if (isMethod) {
-      fn = this.stack.pop();
+      fn = this.callFrame.stack.pop();
     }
 
     if (fn.type === NodeTypeEnum.Undefined) {
@@ -1438,7 +1424,9 @@ export class VM {
     }
 
     fnName &&
-      (fn = this.symbolsArray[fn.index]?.node ?? this.symbols[fnName]?.node);
+      (fn =
+        this.callFrame.symbolsArray[fn.index]?.node ??
+        this.callFrame.symbols[fnName]?.node);
 
     if (!fn) {
       this.errorAndContinue(`Function '${fnName}' is undefined`);
@@ -1456,22 +1444,11 @@ export class VM {
       return this.newNode();
     }
 
-    const vm = new VM(fn.value, fn.funcNode.originFilePath);
-    vm.variableMap = fn.funcNode?.variableMap;
-    vm.capturedIds = fn.meta.capturedIds;
-    vm.operators = this.operators;
-    vm.parentVM = this;
-    vm.functionName = fn.funcNode?.name ?? "anonymous";
-    vm.injectBuiltins = this.injectBuiltins;
-    if (this.injectBuiltins) {
-      vm.builtins = {
-        ...this.builtins,
-        __vm: vm.builtins.__vm,
-        __builtins: vm.builtins.__builtins,
-        exec: vm.builtins.exec,
-        break: vm.builtins.break,
-      };
-    }
+    const frame = newCallFrame(fn.value);
+    frame.parentFrame = this.callFrame;
+    frame.variableMap = fn.funcNode?.variableMap;
+    frame.capturedIds = fn.funcNode?.capturedIds;
+    frame.name = fn.funcNode?.name ?? "anonymous";
 
     // First call of coroutine
     if (fn.funcNode.isCoroutine && fn.funcNode.coroutineIndex === undefined) {
@@ -1498,21 +1475,21 @@ export class VM {
 
     if (fn.funcNode.coroutineIndex !== undefined) {
       for (const key in fn.funcNode.closures) {
-        vm.symbols[key] = fn.funcNode.closures[key];
+        frame.symbols[key] = fn.funcNode.closures[key];
       }
 
-      vm.symbolsArray = fn.funcNode.symbolsArray;
+      frame.symbolsArray = fn.funcNode.symbolsArray;
 
-      vm.index = fn.funcNode.coroutineIndex;
-      vm.node = vm.nodes[vm.index];
+      frame.index = fn.funcNode.coroutineIndex;
+      frame.instruction = frame.instructions[frame.index];
     } else {
       for (const key in fn.funcNode.closures) {
-        vm.symbols[key] = fn.funcNode.closures[key];
+        frame.symbols[key] = fn.funcNode.closures[key];
       }
     }
 
-    if (fnName && !vm.symbols[fnName]) {
-      vm.symbols[fnName] = { node: fn, const: false };
+    if (fnName && !frame.symbols[fnName]) {
+      frame.symbols[fnName] = { node: fn, const: false };
     }
 
     fn.funcNode.params.forEach((param, index) => {
@@ -1528,7 +1505,7 @@ export class VM {
           catchAll.nodes.push(arg);
         }
 
-        vm.symbolsArray.push({
+        frame.symbolsArray.push({
           node: catchAll,
           const: false,
         });
@@ -1543,7 +1520,7 @@ export class VM {
           paramValue = args[index];
         }
 
-        vm.symbolsArray.push({
+        frame.symbolsArray.push({
           node: paramValue,
           const: false,
         });
@@ -1551,8 +1528,8 @@ export class VM {
     });
 
     for (const prop in namedArgs) {
-      const index = vm.variableMap[prop];
-      vm.symbolsArray[index] = {
+      const index = frame.variableMap[prop];
+      frame.symbolsArray[index] = {
         node: namedArgs[prop],
         const: false,
       };
@@ -1563,8 +1540,8 @@ export class VM {
     if (fn.schema) {
       Object.keys(fn.schema.value).forEach((key) => {
         const schemaProp = fn.schema.value[key];
-        const index = vm.variableMap[key];
-        const valueType = NodeTypeEnum[vm.symbolsArray[index].node.type];
+        const index = frame.variableMap[key];
+        const valueType = NodeTypeEnum[frame.symbolsArray[index].node.type];
 
         if (schemaProp.type === NodeTypeEnum.List && schemaProp.nodes) {
           if (!schemaProp.nodes.map((e) => e.value).includes(valueType)) {
@@ -1596,22 +1573,18 @@ export class VM {
       return n;
     });
 
-    const res = vm.evaluate();
-
-    if (fn.class) {
-      res.class = fn;
-    }
+    this.advance();
+    this.callFrames.push(frame);
+    this.callFrame = frame;
 
     if (fn.funcNode?.isCoroutine) {
-      fn.funcNode.coroutineIndex = vm.index + 1;
-      fn.funcNode.coroutineSymbols = vm.symbols;
-      Object.entries(vm.variableMap).forEach(([key, index]) => {
-        const symbol = vm.symbolsArray[index];
+      fn.funcNode.coroutineIndex = frame.index + 1;
+      fn.funcNode.coroutineSymbols = frame.symbols;
+      Object.entries(frame.variableMap).forEach(([key, index]) => {
+        const symbol = frame.symbolsArray[index];
         fn.funcNode.symbolsArray[index] = symbol;
       });
     }
-
-    return res;
   }
 
   private evaluateList(node: Node) {
@@ -1623,7 +1596,7 @@ export class VM {
     evaluatedList.nodes = [];
     var arg;
     while (true) {
-      arg = this.stack.pop();
+      arg = this.callFrame.stack.pop();
       if (arg.type === NodeTypeEnum.ListBegin) {
         break;
       }
@@ -1640,8 +1613,8 @@ export class VM {
     evaluatedObject.evaluated = true;
     evaluatedObject.value = {};
     for (let i = 0; i < node.value; i++) {
-      const value = this.stack.pop();
-      var key = this.stack.pop();
+      const value = this.callFrame.stack.pop();
+      var key = this.callFrame.stack.pop();
 
       if (key.type === NodeTypeEnum.List) {
         key = this.evaluateID(key.nodes[0]);
@@ -1666,25 +1639,25 @@ export class VM {
   }
 
   public findClosure(id: string) {
-    let vm = this;
-    while (vm) {
-      if (vm.symbols.hasOwnProperty(id)) {
-        return vm.symbols[id];
+    let frame = this.callFrame;
+    while (frame) {
+      if (frame.symbols.hasOwnProperty(id)) {
+        return frame.symbols[id];
       }
-      vm = vm.parentVM as any;
+      frame = frame.parentFrame;
     }
 
     return undefined;
   }
 
   public findSymbol_(id: string) {
-    let vm = this;
-    while (vm) {
-      if (vm.variableMap.hasOwnProperty(id)) {
-        const index = vm.variableMap[id];
-        return vm.symbolsArray[index];
+    let frame = this.callFrame;
+    while (frame) {
+      if (frame.variableMap.hasOwnProperty(id)) {
+        const index = frame.variableMap[id];
+        return frame.symbolsArray[index];
       }
-      vm = vm.parentVM as any;
+      frame = frame.parentFrame;
     }
 
     return undefined;
@@ -1707,13 +1680,13 @@ export class VM {
     };
     fn.meta = node.meta;
     fn.class = node.class;
-    var numParams = this.stack.pop();
+    var numParams = this.callFrame.stack.pop();
     if (numParams.type === NodeTypeEnum.Object) {
       fn.schema = numParams;
-      numParams = this.stack.pop();
+      numParams = this.callFrame.stack.pop();
     }
     for (let i = 0; i < numParams.value; i++) {
-      const param = this.stack.pop();
+      const param = this.callFrame.stack.pop();
       if (param.type === NodeTypeEnum.DefaultParam) {
         fn.funcNode.params.unshift(param.left);
         fn.funcNode.defaults[param.left.value] = param.right;
@@ -1736,7 +1709,7 @@ export class VM {
 
     // Inject globals
 
-    Object.entries(this.symbols).forEach(([key, value]) => {
+    Object.entries(this.callFrame.symbols).forEach(([key, value]) => {
       if (value.isGlobal) {
         fn.funcNode.closures[key] = value;
       }
@@ -1772,32 +1745,32 @@ export class VM {
     },
     [NodeTypeEnum.ForStatement]: (node: Node) => {
       const startIndex = node.value;
-      this.index = startIndex - 1;
+      this.callFrame.index = startIndex - 1;
       return;
     },
     [NodeTypeEnum.DefaultParam]: (node: Node) => {
-      const value = this.stack.pop();
-      const name = this.stack.pop();
+      const value = this.callFrame.stack.pop();
+      const name = this.callFrame.stack.pop();
       const res = this.newNode(NodeTypeEnum.DefaultParam);
       res.left = name;
       res.right = value;
       return res;
     },
     [NodeTypeEnum.NamedArg]: (node: Node) => {
-      const value = this.stack.pop();
-      const name = this.stack.pop();
+      const value = this.callFrame.stack.pop();
+      const name = this.callFrame.stack.pop();
       const res = this.newNode(NodeTypeEnum.NamedArg);
       res.left = name;
       res.right = value;
       return res;
     },
     [NodeTypeEnum.Return]: (node: Node) => {
-      const res = this.stack.pop();
+      const res = this.callFrame.stack.pop();
       this.resetLoops();
       return this.newNode(NodeTypeEnum.Return, res);
     },
     [NodeTypeEnum.Yield]: (node: Node) => {
-      const res = this.stack.pop();
+      const res = this.callFrame.stack.pop();
       return this.newNode(NodeTypeEnum.Yield, res);
     },
     [NodeTypeEnum.Break]: (node: Node) => {
@@ -1806,19 +1779,19 @@ export class VM {
     },
     [NodeTypeEnum.Continue]: (node: Node) => {
       var loopCount = 1;
-      while (this.node) {
+      while (this.callFrame.instruction) {
         if (
-          this.node.type === NodeTypeEnum.StartForLoop ||
-          this.node.type === NodeTypeEnum.StartWhileLoop
+          this.callFrame.instruction.type === NodeTypeEnum.StartForLoop ||
+          this.callFrame.instruction.type === NodeTypeEnum.StartWhileLoop
         ) {
           loopCount--;
           if (loopCount === 0) {
-            this.index--;
+            this.callFrame.index--;
             break;
           }
         } else if (
-          this.node.type === NodeTypeEnum.ForStatement ||
-          this.node.type === NodeTypeEnum.WhileStatement
+          this.callFrame.instruction.type === NodeTypeEnum.ForStatement ||
+          this.callFrame.instruction.type === NodeTypeEnum.WhileStatement
         ) {
           loopCount++;
         }
@@ -1827,17 +1800,17 @@ export class VM {
       return;
     },
     [NodeTypeEnum.Jump]: (node: Node) => {
-      this.index = node.value;
+      this.callFrame.index = node.value;
       return;
     },
     [NodeTypeEnum.JumpIfTrue]: (node: Node) => {
-      var statement = this.stack.at(-1);
+      var statement = this.callFrame.stack.at(-1);
       if (statement.type === NodeTypeEnum.ID) {
         statement = this.evaluateID(statement);
       }
       if (statement.type === NodeTypeEnum.Error) {
         this.errorAndContinue(statement.value);
-        this.index = node.value;
+        this.callFrame.index = node.value;
         return;
       }
       const truthy =
@@ -1845,18 +1818,18 @@ export class VM {
           ? statement.value
           : statement.type !== NodeTypeEnum.Undefined;
       if (truthy) {
-        this.index = node.value;
+        this.callFrame.index = node.value;
       }
       return;
     },
     [NodeTypeEnum.JumpIfFalse]: (node: Node) => {
-      var statement = this.stack.at(-1);
+      var statement = this.callFrame.stack.at(-1);
       if (statement.type === NodeTypeEnum.ID) {
         statement = this.evaluateID(statement);
       }
       if (statement.type === NodeTypeEnum.Error) {
         this.errorAndContinue(statement.value);
-        this.index = node.value;
+        this.callFrame.index = node.value;
         return;
       }
       const truthy =
@@ -1864,18 +1837,18 @@ export class VM {
           ? statement.value
           : statement.type !== NodeTypeEnum.Undefined;
       if (!truthy) {
-        this.index = node.value;
+        this.callFrame.index = node.value;
       }
       return;
     },
     [NodeTypeEnum.JumpIfFalsePop]: (node: Node) => {
-      var statement = this.stack.pop();
+      var statement = this.callFrame.stack.pop();
       if (statement.type === NodeTypeEnum.ID) {
         statement = this.evaluateID(statement);
       }
       if (statement.type === NodeTypeEnum.Error) {
         this.errorAndContinue(statement.value);
-        this.index = node.value;
+        this.callFrame.index = node.value;
         return;
       }
       const truthy =
@@ -1883,13 +1856,13 @@ export class VM {
           ? statement.value
           : statement.type !== NodeTypeEnum.Undefined;
       if (!truthy) {
-        this.index = node.value;
+        this.callFrame.index = node.value;
       }
       return;
     },
     [NodeTypeEnum.Accessor]: (node: Node) => {
-      const accessor = this.stack.pop();
-      const toAccess = this.stack.pop();
+      const accessor = this.callFrame.stack.pop();
+      const toAccess = this.callFrame.stack.pop();
       if (
         toAccess.type === NodeTypeEnum.Object &&
         accessor.type === NodeTypeEnum.String
@@ -1927,9 +1900,9 @@ export class VM {
       return this.newNode();
     },
     [NodeTypeEnum.ModifyProperty]: (node: Node) => {
-      const accessor = this.stack.pop();
-      const value = this.stack.pop();
-      const toModify = this.stack.pop();
+      const accessor = this.callFrame.stack.pop();
+      const value = this.callFrame.stack.pop();
+      const toModify = this.callFrame.stack.pop();
 
       if (
         toModify.type === NodeTypeEnum.List &&
@@ -1978,7 +1951,7 @@ export class VM {
       return this.newNode();
     },
     [NodeTypeEnum.Pop]: (node: Node) => {
-      this.stack.pop();
+      this.callFrame.stack.pop();
       return;
     },
     [NodeTypeEnum.WhileStatement]: (node: Node) => {
@@ -1988,18 +1961,18 @@ export class VM {
       return;
     },
     [NodeTypeEnum.SwapStack]: (node: Node) => {
-      const a = this.stack.pop();
-      const b = this.stack.pop();
-      this.stack.push(a);
-      this.stack.push(b);
+      const a = this.callFrame.stack.pop();
+      const b = this.callFrame.stack.pop();
+      this.callFrame.stack.push(a);
+      this.callFrame.stack.push(b);
       return;
     },
     [NodeTypeEnum.Eval]: (node: Node) => {
-      const res = this.eval(node.value);
-      return this.newNode(NodeTypeEnum.String, this.toString(res));
+      this.eval(node.value);
+      return;
     },
     [NodeTypeEnum.Import]: (node: Node) => {
-      const importFrom = this.stack.pop();
+      const importFrom = this.callFrame.stack.pop();
       const extName = path.extname(importFrom.value);
       if (!extName.length) {
         importFrom.value += ".sp";
@@ -2015,9 +1988,9 @@ export class VM {
       generator.generate();
 
       const vm = new VM(generator.generatedNodes, generator.filePath);
-      vm.variables = generator.variables;
-      vm.tempVariables = generator.tempVariables;
-      vm.variableMap = generator.variableMap;
+      vm.callFrame.variables = generator.variables;
+      vm.callFrame.tempVariables = generator.tempVariables;
+      vm.callFrame.variableMap = generator.variableMap;
 
       vm.operators = this.operators;
       vm.parentVM = this;
@@ -2032,10 +2005,10 @@ export class VM {
         };
       }
 
-      Object.keys(this.symbols).forEach((k) => {
-        const symbol = this.symbols[k];
+      Object.keys(this.callFrame.symbols).forEach((k) => {
+        const symbol = this.callFrame.symbols[k];
         if (symbol.isGlobal) {
-          vm.symbols[k] = symbol;
+          vm.callFrame.symbols[k] = symbol;
         }
       });
 
@@ -2049,11 +2022,11 @@ export class VM {
       process.chdir(currentDirPath);
 
       if (node.value === 0) {
-        const moduleName = this.stack.pop();
+        const moduleName = this.callFrame.stack.pop();
 
         const cachedObject = this.cachedImports[resolvedPath];
         if (cachedObject) {
-          this.symbols[moduleName.value] = {
+          this.callFrame.symbols[moduleName.value] = {
             node: cachedObject,
             const: false,
           };
@@ -2062,22 +2035,25 @@ export class VM {
 
         const moduleObject = this.newNode(NodeTypeEnum.Object, {});
         moduleObject.evaluated = true;
-        Object.keys(vm.symbols).forEach((key) => {
-          const symbol = vm.symbols[key];
+        Object.keys(vm.callFrame.symbols).forEach((key) => {
+          const symbol = vm.callFrame.symbols[key];
           moduleObject.value[key] = {
             ...symbol.node,
             meta: { hiddenProp: symbol.isGlobal },
           };
         });
-        Object.keys(vm.variableMap).forEach((key) => {
-          const index = vm.variableMap[key];
-          const symbol = vm.symbolsArray[index];
+        Object.keys(vm.callFrame.variableMap).forEach((key) => {
+          const index = vm.callFrame.variableMap[key];
+          const symbol = vm.callFrame.symbolsArray[index];
           moduleObject.value[key] = {
             ...symbol.node,
             meta: { hiddenProp: symbol.isGlobal },
           };
         });
-        this.symbols[moduleName.value] = { node: moduleObject, const: false };
+        this.callFrame.symbols[moduleName.value] = {
+          node: moduleObject,
+          const: false,
+        };
 
         this.cachedImports[resolvedPath] = moduleObject;
 
@@ -2085,10 +2061,12 @@ export class VM {
       }
 
       for (let i = 0; i < node.value; i++) {
-        const name = this.stack.pop();
-        if (vm.variableMap[name.value] !== undefined) {
-          this.symbols[name.value] = {
-            node: vm.symbolsArray[vm.variableMap[name.value]].node,
+        const name = this.callFrame.stack.pop();
+        if (vm.callFrame.variableMap[name.value] !== undefined) {
+          this.callFrame.symbols[name.value] = {
+            node: vm.callFrame.symbolsArray[
+              vm.callFrame.variableMap[name.value]
+            ].node,
             const: false,
           };
         } else {
@@ -2100,12 +2078,12 @@ export class VM {
       return;
     },
     [NodeTypeEnum.Pos]: (node: Node) => {
-      var right = this.stack.pop();
+      var right = this.callFrame.stack.pop();
       right.type === NodeTypeEnum.ID && (right = this.evaluateID(right));
       return right;
     },
     [NodeTypeEnum.Neg]: (node: Node) => {
-      var right = this.stack.pop();
+      var right = this.callFrame.stack.pop();
       right.type === NodeTypeEnum.ID && (right = this.evaluateID(right));
       if (right.type === NodeTypeEnum.Error) {
         return right;
@@ -2116,7 +2094,7 @@ export class VM {
       return this.newNode();
     },
     [NodeTypeEnum.Exclamation]: (node: Node) => {
-      var right = this.stack.pop();
+      var right = this.callFrame.stack.pop();
       const truthy =
         right.type === NodeTypeEnum.Boolean
           ? right.value
@@ -2124,16 +2102,16 @@ export class VM {
       return this.newNode(NodeTypeEnum.Boolean, !truthy);
     },
     [NodeTypeEnum.UnaryTripleDot]: (node: Node) => {
-      var right = this.stack.pop();
+      var right = this.callFrame.stack.pop();
       if (right.type === NodeTypeEnum.List) {
-        right.nodes?.forEach((elem) => this.stack.push(elem));
+        right.nodes?.forEach((elem) => this.callFrame.stack.push(elem));
         return;
       }
       return this.newNode();
     },
     [NodeTypeEnum.Add]: (node: Node) => {
-      var right = this.stack.pop();
-      var left = this.stack.pop();
+      var right = this.callFrame.stack.pop();
+      var left = this.callFrame.stack.pop();
 
       if (left.type === NodeTypeEnum.Error) {
         return left;
@@ -2183,8 +2161,8 @@ export class VM {
       return this.newNode();
     },
     [NodeTypeEnum.Sub]: (node: Node) => {
-      var right = this.stack.pop();
-      var left = this.stack.pop();
+      var right = this.callFrame.stack.pop();
+      var left = this.callFrame.stack.pop();
 
       if (left.type === NodeTypeEnum.Error) {
         return left;
@@ -2202,8 +2180,8 @@ export class VM {
       return this.newNode();
     },
     [NodeTypeEnum.Mul]: (node: Node) => {
-      var right = this.stack.pop();
-      var left = this.stack.pop();
+      var right = this.callFrame.stack.pop();
+      var left = this.callFrame.stack.pop();
 
       if (left.type === NodeTypeEnum.Error) {
         return left;
@@ -2272,8 +2250,8 @@ export class VM {
       return this.newNode();
     },
     [NodeTypeEnum.Div]: (node: Node) => {
-      var right = this.stack.pop();
-      var left = this.stack.pop();
+      var right = this.callFrame.stack.pop();
+      var left = this.callFrame.stack.pop();
 
       if (left.type === NodeTypeEnum.Error) {
         return left;
@@ -2291,8 +2269,8 @@ export class VM {
       return this.newNode();
     },
     [NodeTypeEnum.Percent]: (node: Node) => {
-      var right = this.stack.pop();
-      var left = this.stack.pop();
+      var right = this.callFrame.stack.pop();
+      var left = this.callFrame.stack.pop();
 
       if (left.type === NodeTypeEnum.Error) {
         return left;
@@ -2310,8 +2288,8 @@ export class VM {
       return this.newNode();
     },
     [NodeTypeEnum.Caret]: (node: Node) => {
-      var right = this.stack.pop();
-      var left = this.stack.pop();
+      var right = this.callFrame.stack.pop();
+      var left = this.callFrame.stack.pop();
 
       if (left.type === NodeTypeEnum.Error) {
         return left;
@@ -2329,28 +2307,28 @@ export class VM {
       return this.newNode();
     },
     [NodeTypeEnum.Equal]: (node: Node) => {
-      var right = this.stack.pop();
-      var left = this.stack.pop();
+      var right = this.callFrame.stack.pop();
+      var left = this.callFrame.stack.pop();
 
       if (right.type === NodeTypeEnum.Error) {
         return right;
       }
 
       if (left.index >= 0) {
-        this.symbolsArray[left.index].node = right;
+        this.callFrame.symbolsArray[left.index].node = right;
         return right;
       }
 
-      if (this.symbols.hasOwnProperty(left.value)) {
-        this.symbols[left.value].node = right;
+      if (this.callFrame.symbols.hasOwnProperty(left.value)) {
+        this.callFrame.symbols[left.value].node = right;
         return right;
       }
 
       return this.newNode();
     },
     [NodeTypeEnum.TripleDot]: (node: Node) => {
-      var right = this.stack.pop();
-      var left = this.stack.pop();
+      var right = this.callFrame.stack.pop();
+      var left = this.callFrame.stack.pop();
 
       if (left.type === NodeTypeEnum.Error) {
         return left;
@@ -2370,8 +2348,8 @@ export class VM {
       return this.newError("Range operands must be of type Number");
     },
     [NodeTypeEnum.DoubleDot]: (node: Node) => {
-      var right = this.stack.pop();
-      var left = this.stack.pop();
+      var right = this.callFrame.stack.pop();
+      var left = this.callFrame.stack.pop();
 
       if (left.type === NodeTypeEnum.Error) {
         return left;
@@ -2392,8 +2370,8 @@ export class VM {
       return this.newError("Range operands must be of type Number");
     },
     [NodeTypeEnum.Pipe]: (node: Node) => {
-      var right = this.stack.pop();
-      var left = this.stack.pop();
+      var right = this.callFrame.stack.pop();
+      var left = this.callFrame.stack.pop();
 
       if (left.type === NodeTypeEnum.Error) {
         return left;
@@ -2423,8 +2401,8 @@ export class VM {
       return this.newNode();
     },
     [NodeTypeEnum.EqualEqual]: (node: Node) => {
-      var right = this.stack.pop();
-      var left = this.stack.pop();
+      var right = this.callFrame.stack.pop();
+      var left = this.callFrame.stack.pop();
 
       if (left.type === NodeTypeEnum.Error) {
         return left;
@@ -2440,8 +2418,8 @@ export class VM {
       return this.newNode(NodeTypeEnum.Boolean, left?.value === right?.value);
     },
     [NodeTypeEnum.NotEqual]: (node: Node) => {
-      var right = this.stack.pop();
-      var left = this.stack.pop();
+      var right = this.callFrame.stack.pop();
+      var left = this.callFrame.stack.pop();
 
       if (left.type === NodeTypeEnum.Error) {
         return left;
@@ -2457,8 +2435,8 @@ export class VM {
       return this.newNode(NodeTypeEnum.Boolean, left?.value !== right?.value);
     },
     [NodeTypeEnum.LessThan]: (node: Node) => {
-      var right = this.stack.pop();
-      var left = this.stack.pop();
+      var right = this.callFrame.stack.pop();
+      var left = this.callFrame.stack.pop();
 
       if (left.type === NodeTypeEnum.Error) {
         return left;
@@ -2474,8 +2452,8 @@ export class VM {
       return this.newNode(NodeTypeEnum.Boolean, left?.value < right?.value);
     },
     [NodeTypeEnum.GreaterThan]: (node: Node) => {
-      var right = this.stack.pop();
-      var left = this.stack.pop();
+      var right = this.callFrame.stack.pop();
+      var left = this.callFrame.stack.pop();
 
       if (left.type === NodeTypeEnum.Error) {
         return left;
@@ -2491,8 +2469,8 @@ export class VM {
       return this.newNode(NodeTypeEnum.Boolean, left?.value > right?.value);
     },
     [NodeTypeEnum.LessThanOrEqual]: (node: Node) => {
-      var right = this.stack.pop();
-      var left = this.stack.pop();
+      var right = this.callFrame.stack.pop();
+      var left = this.callFrame.stack.pop();
 
       if (left.type === NodeTypeEnum.Error) {
         return left;
@@ -2508,8 +2486,8 @@ export class VM {
       return this.newNode(NodeTypeEnum.Boolean, left?.value <= right?.value);
     },
     [NodeTypeEnum.GreaterThanOrEqual]: (node: Node) => {
-      var right = this.stack.pop();
-      var left = this.stack.pop();
+      var right = this.callFrame.stack.pop();
+      var left = this.callFrame.stack.pop();
 
       if (left.type === NodeTypeEnum.Error) {
         return left;
@@ -2525,16 +2503,16 @@ export class VM {
       return this.newNode(NodeTypeEnum.Boolean, left?.value >= right?.value);
     },
     [NodeTypeEnum.Load]: (node: Node) => {
-      return this.symbolsArray[node.value].node;
+      return this.callFrame.symbolsArray[node.value].node;
     },
     [NodeTypeEnum.LoadTemp]: (node: Node) => {
       const index = node.value;
-      return this.tempVarsArray[index].node;
+      return this.callFrame.tempVarsArray[index].node;
     },
     [NodeTypeEnum.LoadSymbol]: (node: Node) => {
       const name = node.value;
-      if (this.symbols.hasOwnProperty(name)) {
-        return this.symbols[name].node;
+      if (this.callFrame.symbols.hasOwnProperty(name)) {
+        return this.callFrame.symbols[name].node;
       }
       if (this.builtins.hasOwnProperty(name)) {
         const native = this.newNode(NodeTypeEnum.Native);
@@ -2548,47 +2526,47 @@ export class VM {
       return this.newError(`Variable '${name}' is undefined`);
     },
     [NodeTypeEnum.Store]: (node: Node) => {
-      const value = this.stack.pop();
-      this.symbolsArray[node.value].node = value;
+      const value = this.callFrame.stack.pop();
+      this.callFrame.symbolsArray[node.value].node = value;
       return value;
     },
     [NodeTypeEnum.AddAssign]: (node: Node) => {
-      const right = this.stack.pop();
-      const left = this.symbolsArray[node.value].node;
+      const right = this.callFrame.stack.pop();
+      const left = this.callFrame.symbolsArray[node.value].node;
       // TODO: replace with function
       if (
         left.type === NodeTypeEnum.Number &&
         right.type === NodeTypeEnum.Number
       ) {
-        this.symbolsArray[node.value].node = this.newNode(
+        this.callFrame.symbolsArray[node.value].node = this.newNode(
           NodeTypeEnum.Number,
           left.value + right.value
         );
-        return this.symbolsArray[node.value].node;
+        return this.callFrame.symbolsArray[node.value].node;
       }
 
       if (
         left.type === NodeTypeEnum.String &&
         right.type === NodeTypeEnum.String
       ) {
-        this.symbolsArray[node.value].node = this.newNode(
+        this.callFrame.symbolsArray[node.value].node = this.newNode(
           NodeTypeEnum.Number,
           left.value + right.value
         );
-        return this.symbolsArray[node.value].node;
+        return this.callFrame.symbolsArray[node.value].node;
       }
 
       if (left.type === NodeTypeEnum.List && right.type === NodeTypeEnum.List) {
-        this.symbolsArray[node.value].node = this.newNode(
+        this.callFrame.symbolsArray[node.value].node = this.newNode(
           NodeTypeEnum.List,
           undefined,
           true
         );
-        this.symbolsArray[node.value].node.nodes = [
+        this.callFrame.symbolsArray[node.value].node.nodes = [
           ...left?.nodes,
           ...right?.nodes,
         ];
-        return this.symbolsArray[node.value].node;
+        return this.callFrame.symbolsArray[node.value].node;
       }
 
       if (
@@ -2605,31 +2583,41 @@ export class VM {
           });
           newObject.handler = newHandler;
         }
-        this.symbolsArray[node.value].node = newObject;
-        return this.symbolsArray[node.value].node;
+        this.callFrame.symbolsArray[node.value].node = newObject;
+        return this.callFrame.symbolsArray[node.value].node;
       }
     },
   };
 
   public evaluate() {
-    global._vm = this;
-    while (this.node) {
-      const res = this.nodeFunctions[this.node.type](this.node);
-      if (res?.type === NodeTypeEnum.Return) {
-        return res.value;
-      }
-      if (res?.type === NodeTypeEnum.Yield) {
-        return res.value;
+    while (this.callFrame.instruction) {
+      const res = this.nodeFunctions[this.callFrame.instruction.type](
+        this.callFrame.instruction
+      );
+      if (
+        res?.type === NodeTypeEnum.Return ||
+        res?.type === NodeTypeEnum.Yield
+      ) {
+        this.callFrame = this.callFrame.parentFrame;
+        this.callFrames.pop();
+        this.callFrame.stack.push(res.value);
+        return;
       }
       if (res) {
-        this.stack.push(res);
+        this.callFrame.stack.push(res);
       }
       if (res?.type === NodeTypeEnum.Error) {
         this.errorAndContinue(res.value);
       }
       this.advance();
     }
-    global._vm = this.parentVM;
-    return this.stack.pop() ?? this.newNode();
+    const returnValue = this.callFrame.stack.pop() ?? this.newNode();
+    if (!this.callFrame.parentFrame) {
+      return;
+    }
+    this.callFrame = this.callFrame.parentFrame;
+    this.callFrames.pop();
+    this.callFrame.stack.push(returnValue);
+    this.evaluate();
   }
 }

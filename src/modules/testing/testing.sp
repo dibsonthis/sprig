@@ -1,9 +1,8 @@
 {options: [Object, Undefined]}
 const (Test) = (options) => {
-
     const time = exec(`() => performance.now()`)
     const getLocalTests = (options = {}) => {
-        const locals = (__vm(1)).locals
+        const locals = (__frame(1)).locals
         const tests = locals->keys->filter((key) => locals[key]->type == Function && !(options.exclude ?? [])->includes(key) && Str.startsWith(key, "test"))->map((key) => locals[key])
         return tests
     }
@@ -16,7 +15,7 @@ const (Test) = (options) => {
     var currentFunctionName = ""
 
     const assert = (fn, ...args) => {
-        const {line, col, name, filePath} = __vm(1)
+        const {line, col, name, filePath} = __frame(1)
         const result = fn(...args)
         const message = `{{result ? "\e[32m" : "\e[31m"}}Assertion {{result ? "passed" : "failed"}} - {{(fn->inspect).name}}: {{args}} "{{currentFunctionName}}" at {{filePath}}:{{line}}:{{col}}\e[0m`
 

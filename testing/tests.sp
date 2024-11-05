@@ -496,5 +496,24 @@
 
 // Test.run(...tests)
 
-import [globals, operators] : "config"
-print({globals, operators})
+// print({tests})
+
+const time = exec(`() => performance.now()`)
+
+let res = 0
+
+const arr = 0..1000
+
+const startTime = time()
+
+for (arr, x) {
+    for (arr, y) {
+        res += x + y
+    }
+}
+
+const endTime = time()
+
+println(res)
+
+print(`Duration: {{((endTime - startTime) / 1000)->truncate(3)}} s`)

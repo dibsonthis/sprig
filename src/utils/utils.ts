@@ -206,12 +206,6 @@ export const injectCommonAndModules = (
           meta: { hiddenProp: symbol.isGlobal },
         };
       });
-      // Object.keys(moduleVM.symbols).forEach((key) => {
-      //   moduleObject.value[key] = {
-      //     ...moduleVM.symbols[key].node,
-      //     meta: { hiddenProp: moduleVM.symbols[key].isGlobal },
-      //   };
-      // });
       vm.callFrame.symbols[moduleNameMap[moduleName]] = {
         node: moduleObject,
         const: false,

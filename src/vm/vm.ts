@@ -488,44 +488,43 @@ export class VM {
       });
       return builtinsObject;
     },
-    __vm: (args: Node[]) => {
+    __frame: (args: Node[]) => {
       var n = 0;
       if (args.length == 1) {
         const node = args[0];
         if (node.type !== NodeTypeEnum.Number) {
           return this.newError(
-            "Function '__vm' expects argument 'n' to be a Number"
+            "Function '__frame' expects argument 'n' to be a Number"
           );
         }
         n = node.value;
       }
 
-      let vm = this;
+      let frame = this.callFrame;
       for (let i = 0; i < n; i++) {
-        if (!vm.parentVM) {
+        if (!frame.parentFrame) {
           break;
         }
-        vm = vm.parentVM as any;
+        frame = frame.parentFrame;
       }
+
+      const locals = this.newNode(NodeTypeEnum.Object, {}, true);
+
+      Object.keys(frame.variableMap).forEach((key) => {
+        const index = frame.variableMap[key];
+        const symbol = frame.symbolsArray[index];
+        symbol && (locals.value[key] = symbol.node);
+      });
 
       return this.newNode(
         NodeTypeEnum.Object,
         {
-          line: this.newNode(
-            NodeTypeEnum.Number,
-            vm.callFrame.instruction?.line ?? 0
-          ),
-          col: this.newNode(
-            NodeTypeEnum.Number,
-            vm.callFrame.instruction?.col ?? 0
-          ),
-          filePath: this.newNode(NodeTypeEnum.String, vm.filePath),
-          name: this.newNode(
-            NodeTypeEnum.String,
-            vm.functionName ?? "anonymous"
-          ),
+          line: this.newNode(NodeTypeEnum.Number, frame.instruction?.line ?? 0),
+          col: this.newNode(NodeTypeEnum.Number, frame.instruction?.col ?? 0),
+          filePath: this.newNode(NodeTypeEnum.String, frame.filePath),
+          name: this.newNode(NodeTypeEnum.String, frame.name ?? "anonymous"),
           vmPath: this.newNode(NodeTypeEnum.String, __dirname),
-          locals: vm.builtins.locals([]),
+          locals,
         },
         true
       );
@@ -594,8 +593,8 @@ export class VM {
         );
       }
 
-      const res = this.eval(node.value, env);
-      return res;
+      this.eval(node.value, env);
+      return;
     },
     loadLib: (args: Node[]) => {
       if (args.length !== 1) {
@@ -1998,7 +1997,7 @@ export class VM {
       if (this.injectBuiltins) {
         vm.builtins = {
           ...this.builtins,
-          __vm: vm.builtins.__vm,
+          __frame: vm.builtins.__frame,
           __builtins: vm.builtins.__builtins,
           exec: vm.builtins.exec,
           break: vm.builtins.break,
@@ -2134,6 +2133,15 @@ export class VM {
         return this.newNode(NodeTypeEnum.String, left.value + right.value);
       }
 
+      if (left.type === NodeTypeEnum.String) {
+        if (right.type === NodeTypeEnum.String) {
+          return this.newNode(NodeTypeEnum.String, left.value + right.value);
+        }
+        return this.newNode(
+          NodeTypeEnum.String,
+          left.value + this.toString(right)
+        );
+      }
       if (left.type === NodeTypeEnum.List && right.type === NodeTypeEnum.List) {
         const newList = this.newNode(NodeTypeEnum.List);
         newList.evaluated = true;
@@ -2598,10 +2606,10 @@ export class VM {
         res?.type === NodeTypeEnum.Return ||
         res?.type === NodeTypeEnum.Yield
       ) {
-        this.callFrame = this.callFrame.parentFrame;
-        this.callFrames.pop();
+        // this.callFrame = this.callFrame.parentFrame;
+        // this.callFrames.pop();
         this.callFrame.stack.push(res.value);
-        return;
+        break;
       }
       if (res) {
         this.callFrame.stack.push(res);

@@ -1,4 +1,4 @@
-import { Node, SymbolTable, NodeTypeEnum, CallFrame } from "../types";
+import { Node, NodeTypeEnum, CallFrame } from "../types";
 import { Lexer } from "../lexer/lexer";
 import { Parser } from "../parser/parser";
 import { Generator } from "../generator/generator";
@@ -19,7 +19,7 @@ const newCallFrame = (instructions = []): CallFrame => {
     tempVariables: [],
     variableMap: {},
     tempVars: {},
-    capturedIds: new Set<string>(),
+    capturedIds: new Set<string>([]),
   };
 };
 
@@ -411,7 +411,7 @@ export class VM {
     evalFrame.name = "eval";
     evalFrame.capturedIds = generator.capturedIds;
     evalFrame.capturedIds = new Set([
-      ...this.callFrame.capturedIds,
+      ...(this.callFrame.capturedIds ?? new Set<string>()),
       ...evalFrame.capturedIds,
     ]);
 
@@ -453,15 +453,25 @@ export class VM {
     if (fn.type !== NodeTypeEnum.Function && fn.type !== NodeTypeEnum.Native) {
       return this.newNode();
     }
-    this.callFrame.stack.push(this.newNode(NodeTypeEnum.FunctionCallBegin));
+    const vm = new VM(fn.value, this.filePath);
+    // vm.callFrame.instructions.push(
+    //   this.newNode(NodeTypeEnum.FunctionCallBegin)
+    // );
     args.forEach((arg) => {
       arg.evaluated = true;
-      this.callFrame.stack.push(arg);
+      // vm.callFrame.instructions.push(arg);
+      vm.callFrame.symbolsArray.push({ const: true, node: arg });
     });
-    this.callFrame.stack.push(fn);
-    const functionCall = this.newNode(NodeTypeEnum.FunctionCall);
+    Object.entries(fn.funcNode?.closures ?? {}).forEach(([k, v]) => {
+      vm.callFrame.symbols[k] = v;
+    });
 
-    return this.evaluateFunctionCall(functionCall);
+    vm.callFrame.variableMap = fn.funcNode?.variableMap;
+    // vm.callFrame.instructions.push(fn);
+    // vm.callFrame.instructions.push(this.newNode(NodeTypeEnum.FunctionCall));
+    // vm.callFrame.instruction = vm.callFrame.instructions[0];
+    const res = vm.evaluate();
+    return res;
   }
 
   public run(native: Node, args: Node[]) {
@@ -988,114 +998,114 @@ export class VM {
       objCopy.handler = handler;
       return objCopy;
     },
-    forEach: (args: Node[]) => {
-      if (args.length !== 2) {
-        return this.newError("Function 'forEach' expects 2 arguments");
-      }
-      const arr = args[0];
-      const fn = args[1];
-      if (arr.type !== NodeTypeEnum.List) {
-        return this.newError(
-          "Function 'forEach' expects argument 'list' to be a List"
-        );
-      }
-      if (fn.type !== NodeTypeEnum.Function) {
-        return this.newError(
-          "Function 'forEach' expects argument 'fn' to be a Function"
-        );
-      }
+    // forEach: (args: Node[]) => {
+    //   if (args.length !== 2) {
+    //     return this.newError("Function 'forEach' expects 2 arguments");
+    //   }
+    //   const arr = args[0];
+    //   const fn = args[1];
+    //   if (arr.type !== NodeTypeEnum.List) {
+    //     return this.newError(
+    //       "Function 'forEach' expects argument 'list' to be a List"
+    //     );
+    //   }
+    //   if (fn.type !== NodeTypeEnum.Function) {
+    //     return this.newError(
+    //       "Function 'forEach' expects argument 'fn' to be a Function"
+    //     );
+    //   }
 
-      const fnCall = this.newNode(NodeTypeEnum.FunctionCall);
-      const argsNode = this.newNode(NodeTypeEnum.List);
+    //   const fnCall = this.newNode(NodeTypeEnum.FunctionCall);
+    //   const argsNode = this.newNode(NodeTypeEnum.List);
 
-      arr.nodes?.forEach((elem, index) => {
-        argsNode.nodes = [elem];
-        if (fn.funcNode?.params.length == 2) {
-          argsNode.nodes.push(this.newNode(NodeTypeEnum.Number, index));
-        }
-        this.callFrame.stack.push(this.newNode(NodeTypeEnum.FunctionCallBegin));
-        argsNode.nodes.forEach((node) => this.callFrame.stack.push(node));
-        this.callFrame.stack.push(fn);
-        this.evaluateFunctionCall(fnCall);
-      });
-    },
-    map: (args: Node[]) => {
-      if (args.length !== 2) {
-        return this.newError("Function 'map' expects 2 arguments");
-      }
-      const arr = args[0];
-      const fn = args[1];
-      if (arr.type !== NodeTypeEnum.List) {
-        return this.newError(
-          "Function 'map' expects argument 'list' to be a List"
-        );
-      }
-      if (fn.type !== NodeTypeEnum.Function) {
-        return this.newError(
-          "Function 'map' expects argument 'fn' to be a Function"
-        );
-      }
+    //   arr.nodes?.forEach((elem, index) => {
+    //     argsNode.nodes = [elem];
+    //     if (fn.funcNode?.params.length == 2) {
+    //       argsNode.nodes.push(this.newNode(NodeTypeEnum.Number, index));
+    //     }
+    //     this.callFrame.stack.push(this.newNode(NodeTypeEnum.FunctionCallBegin));
+    //     argsNode.nodes.forEach((node) => this.callFrame.stack.push(node));
+    //     this.callFrame.stack.push(fn);
+    //     this.evaluateFunctionCall(fnCall);
+    //   });
+    // },
+    // map: (args: Node[]) => {
+    //   if (args.length !== 2) {
+    //     return this.newError("Function 'map' expects 2 arguments");
+    //   }
+    //   const arr = args[0];
+    //   const fn = args[1];
+    //   if (arr.type !== NodeTypeEnum.List) {
+    //     return this.newError(
+    //       "Function 'map' expects argument 'list' to be a List"
+    //     );
+    //   }
+    //   if (fn.type !== NodeTypeEnum.Function) {
+    //     return this.newError(
+    //       "Function 'map' expects argument 'fn' to be a Function"
+    //     );
+    //   }
 
-      const newArr = { ...arr };
+    //   const newArr = { ...arr };
 
-      const fnCall = this.newNode(NodeTypeEnum.FunctionCall);
-      const argsNode = this.newNode(NodeTypeEnum.List);
+    //   const fnCall = this.newNode(NodeTypeEnum.FunctionCall);
+    //   const argsNode = this.newNode(NodeTypeEnum.List);
 
-      newArr.nodes = newArr.nodes?.map((elem, index) => {
-        argsNode.nodes = [elem];
-        if (fn.funcNode?.params.length == 2) {
-          argsNode.nodes.push(this.newNode(NodeTypeEnum.Number, index));
-        }
-        this.callFrame.stack.push(this.newNode(NodeTypeEnum.FunctionCallBegin));
-        argsNode.nodes.forEach((node) => this.callFrame.stack.push(node));
-        this.callFrame.stack.push(fn);
-        return this.evaluateFunctionCall(fnCall);
-      });
+    //   newArr.nodes = newArr.nodes?.map((elem, index) => {
+    //     argsNode.nodes = [elem];
+    //     if (fn.funcNode?.params.length == 2) {
+    //       argsNode.nodes.push(this.newNode(NodeTypeEnum.Number, index));
+    //     }
+    //     this.callFrame.stack.push(this.newNode(NodeTypeEnum.FunctionCallBegin));
+    //     argsNode.nodes.forEach((node) => this.callFrame.stack.push(node));
+    //     this.callFrame.stack.push(fn);
+    //     return this.evaluateFunctionCall(fnCall);
+    //   });
 
-      return newArr;
-    },
-    filter: (args: Node[]) => {
-      if (args.length !== 2) {
-        return this.newError("Function 'filter' expects 2 arguments");
-      }
-      const arr = args[0];
-      const fn = args[1];
-      if (arr.type !== NodeTypeEnum.List) {
-        return this.newError(
-          "Function 'filter' expects argument 'list' to be a List"
-        );
-      }
-      if (fn.type !== NodeTypeEnum.Function) {
-        return this.newError(
-          "Function 'filter' expects argument 'fn' to be a Function"
-        );
-      }
+    //   return newArr;
+    // },
+    // filter: (args: Node[]) => {
+    //   if (args.length !== 2) {
+    //     return this.newError("Function 'filter' expects 2 arguments");
+    //   }
+    //   const arr = args[0];
+    //   const fn = args[1];
+    //   if (arr.type !== NodeTypeEnum.List) {
+    //     return this.newError(
+    //       "Function 'filter' expects argument 'list' to be a List"
+    //     );
+    //   }
+    //   if (fn.type !== NodeTypeEnum.Function) {
+    //     return this.newError(
+    //       "Function 'filter' expects argument 'fn' to be a Function"
+    //     );
+    //   }
 
-      const newArr = { ...arr };
+    //   const newArr = { ...arr };
 
-      const fnCall = this.newNode(NodeTypeEnum.FunctionCall);
-      const argsNode = this.newNode(NodeTypeEnum.List);
+    //   const fnCall = this.newNode(NodeTypeEnum.FunctionCall);
+    //   const argsNode = this.newNode(NodeTypeEnum.List);
 
-      newArr.nodes = newArr.nodes?.filter((elem, index) => {
-        argsNode.nodes = [elem];
-        if (fn.funcNode?.params.length == 2) {
-          argsNode.nodes.push(this.newNode(NodeTypeEnum.Number, index));
-        }
-        this.callFrame.stack.push(this.newNode(NodeTypeEnum.FunctionCallBegin));
-        argsNode.nodes.forEach((node) => this.callFrame.stack.push(node));
-        this.callFrame.stack.push(fn);
-        const res = this.evaluateFunctionCall(fnCall);
+    //   newArr.nodes = newArr.nodes?.filter((elem, index) => {
+    //     argsNode.nodes = [elem];
+    //     if (fn.funcNode?.params.length == 2) {
+    //       argsNode.nodes.push(this.newNode(NodeTypeEnum.Number, index));
+    //     }
+    //     this.callFrame.stack.push(this.newNode(NodeTypeEnum.FunctionCallBegin));
+    //     argsNode.nodes.forEach((node) => this.callFrame.stack.push(node));
+    //     this.callFrame.stack.push(fn);
+    //     const res = this.evaluateFunctionCall(fnCall);
 
-        const truthy =
-          res.type === NodeTypeEnum.Boolean
-            ? res.value
-            : res.type !== NodeTypeEnum.Undefined;
+    //     const truthy =
+    //       res.type === NodeTypeEnum.Boolean
+    //         ? res.value
+    //         : res.type !== NodeTypeEnum.Undefined;
 
-        return truthy;
-      });
+    //     return truthy;
+    //   });
 
-      return newArr;
-    },
+    //   return newArr;
+    // },
   };
 
   private evaluateOperator(node: Node) {
@@ -1448,6 +1458,9 @@ export class VM {
     frame.variableMap = fn.funcNode?.variableMap;
     frame.capturedIds = fn.funcNode?.capturedIds;
     frame.name = fn.funcNode?.name ?? "anonymous";
+    if (fn.class) {
+      frame.class = fn;
+    }
 
     // First call of coroutine
     if (fn.funcNode.isCoroutine && fn.funcNode.coroutineIndex === undefined) {
@@ -2620,12 +2633,19 @@ export class VM {
       this.advance();
     }
     const returnValue = this.callFrame.stack.pop() ?? this.newNode();
+    if (!returnValue.class) {
+      returnValue.class = this.callFrame.class;
+    }
     if (!this.callFrame.parentFrame) {
-      return;
+      return returnValue;
     }
     this.callFrame = this.callFrame.parentFrame;
     this.callFrames.pop();
     this.callFrame.stack.push(returnValue);
-    this.evaluate();
+    const res = this.evaluate();
+    if (!returnValue.class) {
+      res.class = this.callFrame.class;
+    }
+    return res;
   }
 }

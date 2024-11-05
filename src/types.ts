@@ -231,6 +231,7 @@ export type NodeArray = {
 
 export type CallFrame = {
   name?: string;
+  class?: Node;
   filePath: string;
   parentFrame?: CallFrame;
   capturedIds?: Set<string>;

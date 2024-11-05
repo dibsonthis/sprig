@@ -7,7 +7,7 @@ const instanceOf = (value, constructor) => {
 
 // List Functions
 
-{arr: List}
+// {arr: List}
 const includes = (arr, value) => {
     for (arr, v) {
         if (v == value) {
@@ -17,7 +17,34 @@ const includes = (arr, value) => {
     return false
 }
 
-{arr: List, fn: Function}
+// {arr: List, fn: Function}
+const forEach = (arr, fn) => {
+    for (arr, value, index) {
+        fn(value, index)
+    }
+}
+
+// {arr: List, fn: Function}
+const map = (arr, fn) => {
+    const res = []
+    for (arr, value, index) {
+        res->append(fn(value, index))
+    }
+    return res
+}
+
+// {arr: List, fn: Function}
+const filter = (arr, fn) => {
+    const res = []
+    for (arr, value, index) {
+        if (fn(value, index)) {
+            res->append(value)
+        }
+    }
+    return res
+}
+
+// {arr: List, fn: Function}
 const reduce = (arr, fn, init) => {
     var res = arr[0]
     var index = 1

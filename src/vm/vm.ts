@@ -440,7 +440,7 @@ export class VM {
       if (symbol) {
         vm.symbols[id] = symbol;
       } else {
-        const closure = this.findSymbol(id);
+        const closure = this.findClosure(id);
         if (closure) {
           vm.symbols[id] = closure;
         }
@@ -1665,7 +1665,7 @@ export class VM {
     return evaluatedObject;
   }
 
-  public findSymbol(id: string) {
+  public findClosure(id: string) {
     let vm = this;
     while (vm) {
       if (vm.symbols.hasOwnProperty(id)) {
@@ -1727,7 +1727,7 @@ export class VM {
       if (symbol) {
         fn.funcNode.closures[id] = symbol;
       } else {
-        const closure = this.findSymbol(id);
+        const closure = this.findClosure(id);
         if (closure) {
           fn.funcNode.closures[id] = closure;
         }

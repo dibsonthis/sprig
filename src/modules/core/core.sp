@@ -63,6 +63,7 @@ const removeOperator = (operator) => {
 
 const addVariable = (name, value) => {
     const nativeFn = exec(`(name, value) => {
+        console.log(_vm.callFrames.length)
         if (_vm.callFrame.parentFrame) {
             _vm.callFrame.parentFrame.symbols[name] = {
                 node: _vm.jsToNode(value),

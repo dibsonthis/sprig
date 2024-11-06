@@ -54,7 +54,7 @@ export class VM {
   constructor(nodes: Node[], filePath: string = ".", restricted = false) {
     this.filePath = filePath;
     this.callFrame.instructions = nodes;
-    this.callFrame.instruction = nodes[0];
+    this.callFrame.instruction = nodes?.[0];
     this.callFrame.index = 0;
     this.callFrame.name = filePath;
     this.callFrame.filePath = filePath;
@@ -457,6 +457,13 @@ export class VM {
     }
     if (fn.type == NodeTypeEnum.Function) {
       const vm = new VM(fn.value, this.filePath);
+      vm.builtins = {
+        ...this.builtins,
+        __frame: vm.builtins.__frame,
+        __builtins: vm.builtins.__builtins,
+        exec: vm.builtins.exec,
+        break: vm.builtins.break,
+      };
       args.forEach((arg) => {
         arg.evaluated = true;
         vm.callFrame.symbolsArray.push({ const: true, node: arg });
@@ -467,6 +474,7 @@ export class VM {
 
       vm.callFrame.variableMap = fn.funcNode?.variableMap;
       const res = vm.evaluate();
+      global._vm = this;
       return res;
     }
 
@@ -1894,6 +1902,13 @@ export class VM {
       generator.generate();
 
       const vm = new VM(generator.generatedNodes, generator.filePath);
+      vm.builtins = {
+        ...this.builtins,
+        __frame: vm.builtins.__frame,
+        __builtins: vm.builtins.__builtins,
+        exec: vm.builtins.exec,
+        break: vm.builtins.break,
+      };
       vm.callFrame.variables = generator.variables;
       vm.callFrame.tempVariables = generator.tempVariables;
       vm.callFrame.variableMap = generator.variableMap;
@@ -2506,18 +2521,48 @@ export class VM {
 
   public evaluate() {
     global._vm = this;
-    while (this.callFrame.instruction) {
+    while (true) {
+      while (!this.callFrame.instruction) {
+        if (this.callFrame.parentFrame) {
+          const result = this.callFrame.stack.pop() ?? this.newNode();
+          this.callFrame = this.callFrame.parentFrame;
+          this.callFrames.pop();
+          this.callFrame.stack.push(result);
+        } else {
+          return this.callFrame.stack.pop() ?? this.newNode();
+        }
+      }
+
       const res = this.nodeFunctions[this.callFrame.instruction.type](
         this.callFrame.instruction
       );
+
       if (
         res?.type === NodeTypeEnum.Return ||
         res?.type === NodeTypeEnum.Yield
       ) {
-        // this.callFrame = this.callFrame.parentFrame;
-        // this.callFrames.pop();
-        this.callFrame.stack.push(res.value);
-        break;
+        const returnValue = res.value;
+        if (!returnValue.class) {
+          returnValue.class = this.callFrame.class;
+        }
+
+        if (this.callFrame.coroutine) {
+          this.callFrame.coroutine.funcNode.coroutineIndex =
+            this.callFrame.index - 2;
+          Object.entries(this.callFrame.variableMap).forEach(([key, index]) => {
+            const symbol = this.callFrame.symbolsArray[index];
+            this.callFrame.coroutine.funcNode.symbolsArray[index] = symbol;
+          });
+        }
+
+        if (!this.callFrame.parentFrame) {
+          return returnValue;
+        }
+
+        this.callFrame = this.callFrame.parentFrame;
+        this.callFrames.pop();
+        this.callFrame.stack.push(returnValue);
+        continue;
       }
       if (res) {
         this.callFrame.stack.push(res);
@@ -2525,34 +2570,8 @@ export class VM {
       if (res?.type === NodeTypeEnum.Error) {
         this.errorAndContinue(res.value);
       }
+
       this.advance();
     }
-    const returnValue = this.callFrame.stack.pop() ?? this.newNode();
-    if (!returnValue.class) {
-      returnValue.class = this.callFrame.class;
-    }
-
-    if (this.callFrame.coroutine) {
-      this.callFrame.coroutine.funcNode.coroutineIndex =
-        this.callFrame.index - 2;
-      Object.entries(this.callFrame.variableMap).forEach(([key, index]) => {
-        const symbol = this.callFrame.symbolsArray[index];
-        this.callFrame.coroutine.funcNode.symbolsArray[index] = symbol;
-      });
-    }
-
-    if (!this.callFrame.parentFrame) {
-      return returnValue;
-    }
-
-    this.callFrame = this.callFrame.parentFrame;
-    this.callFrames.pop();
-    this.callFrame.stack.push(returnValue);
-
-    const res = this.evaluate();
-    if (!returnValue.class) {
-      res.class = this.callFrame.class;
-    }
-    return res;
   }
 }

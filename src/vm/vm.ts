@@ -408,6 +408,7 @@ export class VM {
     evalFrame.parentFrame = this.callFrame;
     evalFrame.name = "eval";
     evalFrame.filePath = this.filePath;
+    evalFrame.variableMap = generator.variableMap;
     evalFrame.capturedIds = generator.capturedIds;
     evalFrame.capturedIds = new Set([
       ...(this.callFrame.capturedIds ?? new Set<string>()),

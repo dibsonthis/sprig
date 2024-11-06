@@ -473,6 +473,12 @@ export class VM {
         vm.callFrame.symbols[k] = v;
       });
 
+      for (const key in this.callFrame.variableMap) {
+        const index = this.callFrame.variableMap[key];
+        const symbol = this.callFrame.symbolsArray[index];
+        vm.callFrame.symbols[key] = symbol;
+      }
+
       vm.callFrame.variableMap = fn.funcNode?.variableMap;
       const res = vm.evaluate();
       global._vm = this;

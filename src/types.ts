@@ -246,6 +246,7 @@ export type CallFrame = {
   tempVariables: { id: string; type: string }[];
   variableMap: Record<string, number>;
   tempVars: SymbolTable;
+  coroutine?: Node;
 };
 
 export type SymbolTable = Record<

@@ -38,36 +38,35 @@ const test_object = () => {
     assert(isEqual, person.bloop.e, 2401.4)
 }
 
-// // broken
-// const test_coroutines = () => {
-//     const coro = () => {
-//         var x = 0
-//         while (true) {
-//             yield x += 1
-//         }
-//     }
+const test_coroutines = () => {
+    const coro = () => {
+        var x = 0
+        while (true) {
+            yield x += 1
+        }
+    }
 
-//     const c1 = coro();
+    const c1 = coro();
 
-//     while ((let c = c1()) <= 10) {
-//         // do nothing
-//     }
+    while ((let c = c1()) <= 10) {
+        // do nothing
+    }
 
-//     assert(isEqual, c, 11)
+    assert(isEqual, c, 11)
 
-//     const coroAdvanced = (init, value) => {
-//         var x = init
-//         while (true) {
-//             yield x += value
-//         }
-//     }
+    const coroAdvanced = (init, value) => {
+        var x = init
+        while (true) {
+            yield x += value
+        }
+    }
 
-//     const cAdvanced = coroAdvanced(100);
+    const cAdvanced = coroAdvanced(100);
 
-//     const res = cAdvanced(20)
+    const res = cAdvanced(20)
 
-//     assert(isEqual, res, 120)
-// }
+    assert(isEqual, res, 120)
+}
 
 const test_counter = () => {
     const Counter = (init = 0) => {
@@ -341,7 +340,6 @@ const test_imports = () => {
     assert(isNotEqual, io.readFile, undefined)
 }
 
-// // broken
 const test_classes = () => {
     const (Color) = (r = 0, g = 0, b = 0) => {
         const color = {r: 0, g: 0, b: 0}->proxy({
@@ -472,29 +470,28 @@ const test_this = () => {
     assert(isEqual, street, "123 Fake St.")
 }
 
-// // broken
-// const test_core = () => {
+const test_core = () => {
 
-//     // Adding an operator
-//     Core.addOperator("$avg", (a, b) => (a + b) / 2)
-//     const avg = 5 $avg 3
-//     assert(isEqual, avg, 4)
+    // Adding an operator
+    Core.addOperator("$avg", (a, b) => (a + b) / 2)
+    const avg = 5 $avg 3
+    assert(isEqual, avg, 4)
     
-//     // Adding a variable
-//     Core.addVariable("__x__", 500)
-//     assert(isEqual, __x__, 500)
+    // // Adding a variable
+    Core.addVariable("__x__", 500)
+    assert(isEqual, __x__, 500)
 
-//     // Adding builtin
-//     Core.updateBuiltin("asList", (...args) => args)
-//     const ls = asList(1, 2, 3, 4, 5)
-//     assert(listIncludes, ls, 3)
-//     assert(isEqual, ls->length, 5)
+    // Adding builtin
+    Core.updateBuiltin("asList", (...args) => args)
+    const ls = asList(1, 2, 3, 4, 5)
+    assert(listIncludes, ls, 3)
+    assert(isEqual, ls->length, 5)
 
-//     // Removing builtin
-//     Core.resetBuiltin("asList")
-//     const fn = exec(`_vm.builtins.asList`)
-//     assert(isEqual, fn, undefined)
-// }
+    // Removing builtin
+    Core.resetBuiltin("asList")
+    const fn = exec(`_vm.builtins.asList`)
+    assert(isEqual, fn, undefined)
+}
 
 const tests = getLocalTests()
 

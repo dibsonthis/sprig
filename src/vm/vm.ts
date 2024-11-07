@@ -28,6 +28,7 @@ export class VM {
   public callFrames: CallFrame[] = [this.callFrame];
 
   public operators: Record<string, Node> = {};
+  public paths: Record<string, string> = {};
   public cachedImports = {};
   public filePath: string;
   public functionName: string;
@@ -182,6 +183,9 @@ export class VM {
           }
 
           if (value?.type === NodeTypeEnum.String) {
+            if (value.meta?.hiddenProp) {
+              continue;
+            }
             repr += reprIntercept
               ? `${key}: ${this.toString(value)}`
               : `${key}: "${this.toString(value)}"`;
@@ -1894,11 +1898,18 @@ export class VM {
     },
     [NodeTypeEnum.Import]: (node: Node) => {
       const importFrom = this.callFrame.stack.pop();
-      const extName = path.extname(importFrom.value);
-      if (!extName.length) {
-        importFrom.value += ".sp";
+      let importFromResolved: string = importFrom.value;
+      for (const p in this.paths) {
+        importFromResolved = importFromResolved.replace(
+          new RegExp(p, "g"),
+          this.paths[p]
+        );
       }
-      const lexer = new Lexer(importFrom.value);
+      const extName = path.extname(importFromResolved);
+      if (!extName.length) {
+        importFromResolved += ".sp";
+      }
+      const lexer = new Lexer(importFromResolved);
       lexer.tokenize();
       if (!lexer.nodes.length) {
         return;
@@ -1923,15 +1934,6 @@ export class VM {
       vm.operators = this.operators;
       vm.parentVM = this;
       vm.injectBuiltins = this.injectBuiltins;
-      if (this.injectBuiltins) {
-        vm.builtins = {
-          ...this.builtins,
-          __frame: vm.builtins.__frame,
-          __builtins: vm.builtins.__builtins,
-          exec: vm.builtins.exec,
-          break: vm.builtins.break,
-        };
-      }
 
       Object.keys(this.callFrame.symbols).forEach((k) => {
         const symbol = this.callFrame.symbols[k];
@@ -1940,7 +1942,7 @@ export class VM {
         }
       });
 
-      const resolvedPath = path.resolve(importFrom.value);
+      const resolvedPath = path.resolve(importFromResolved);
       const currentDirPath = process.cwd();
 
       process.chdir(path.dirname(resolvedPath));

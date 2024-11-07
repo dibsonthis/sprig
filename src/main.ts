@@ -75,6 +75,8 @@ try {
     configVM.callFrame.symbolsArray[configVM.callFrame.variableMap.globals];
   const operators =
     configVM.callFrame.symbolsArray[configVM.callFrame.variableMap.operators];
+  const paths =
+    configVM.callFrame.symbolsArray[configVM.callFrame.variableMap.paths];
 
   for (const key of Object.keys(globals?.node?.value ?? {})) {
     vm.callFrame.symbols[key] = {
@@ -93,6 +95,11 @@ try {
     }
   }
 
+  for (const key of Object.keys(paths?.node?.value ?? {})) {
+    const resolvedPath = path.resolve(paths.node.value[key].value);
+    vm.paths[key] = resolvedPath;
+  }
+
   const moduleObject = configParser.newNode(NodeTypeEnum.Object, {});
   moduleObject.evaluated = true;
   Object.entries(configVM.callFrame.variableMap).forEach(([name, index]) => {
@@ -104,6 +111,8 @@ try {
     const: false,
     isGlobal: true,
   };
-} catch (e) {}
+} catch (e) {
+  console.log(e);
+}
 
 vm.evaluate();

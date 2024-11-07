@@ -11,3 +11,7 @@ const operators = {
         return [v]
     },
 }
+
+const paths = {
+    "@modules": "../modules",
+}

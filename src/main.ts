@@ -111,8 +111,6 @@ try {
     const: false,
     isGlobal: true,
   };
-} catch (e) {
-  console.log(e);
-}
+} catch (e) {}
 
 vm.evaluate();

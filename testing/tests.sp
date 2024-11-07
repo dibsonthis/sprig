@@ -493,6 +493,17 @@ const test_core = () => {
     assert(isEqual, fn, undefined)
 }
 
+const test_config = () => {
+
+    // Test resolved paths
+    import [Math] : "@modules/math/math"
+
+    assert(isEqual, APP_ID, "A0001")
+    assert(isEqual, 4 $$ 3, 4)
+    assert(isEqual, Math.floor(4.5), 4)
+    assert(isEqual, __config->length, 3)
+}
+
 const tests = getLocalTests()
 
 Test.run(...tests)

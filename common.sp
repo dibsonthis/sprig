@@ -70,28 +70,37 @@ const slice = (arr, start, end) => {
 
 // Async Functions
 
-const _timeout = exec(`(n, fn, ...args) => {
+const _timeout = exec(`(fn, n) => {
     const s = setTimeout(() => {
-        fn(...args)
+        fn()
       }, n);
       return s
 }`)
 
-{n: Number, fn: Function}
-const timeout = (n, fn, ...args) => {
-    return _timeout(n, fn, ...args)
+{fn: Function, n: Number, }
+const timeout = (fn, n = 0) => {
+    return _timeout(fn, n)
 }
 
-const _interval = exec(`(n, fn, ...args) => {
+const _interval = exec(`(fn, n) => {
     const s = setInterval(() => {
-        fn(...args)
+        fn()
       }, n);
       return s
 }`)
 
-{n: Number, fn: Function}
-const interval = (n, fn, ...args) => {
-    return _interval(n, fn, ...args)
+{fn: Function, n: Number}
+const interval = (fn, n = 0) => {
+    return _interval(fn, n)
+}
+
+const _clearInterval = exec(`(id) => {
+    clearInterval(id);
+}`)
+
+{id: Raw}
+const clearInterval = (id) => {
+    _clearInterval(id)
 }
 
 const _fetch = exec(`(endpoint, ...callbacks) => {

@@ -10,7 +10,7 @@ var price;
 var lastPrice;
 var secondLastPrice;
 
-interval(n, () => {
+interval(() => {
     secondLastPrice = lastPrice
     lastPrice = price
     const diff = (lastPrice - secondLastPrice)->truncate(3)
@@ -19,7 +19,7 @@ interval(n, () => {
         diff > 0 ? `\e[32m${{diff}}\e[0m` : `\e[31m${{diff}}\e[0m`
 
     print(`Price: {{lastPrice}} ({{diffString}})`)
-})
+}, n)
 
 rl->on("line", (data) => {
     wsc->send(data)

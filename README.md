@@ -203,7 +203,7 @@ const commonKeys = __common
 
 ## Config overrides
 
-Adding a `config.sp` file at the top level can set global variables and create custom operators. Anything in the `globals` object will be injected into the global scope. Operators defined in `operators` can be either unary or binary based on the number of parameters provided.
+Adding a `config.sp` file at the top level can set global variables and create custom operators. Anything in the `globals` object will be injected into the global scope. Operators defined in `operators` can be either unary or binary based on the number of parameters provided. Dynamically resolved paths can also be added here, via the `paths` property.
 
 These two objects can also be accessed via `__config`.
 
@@ -212,7 +212,7 @@ These two objects can also be accessed via `__config`.
 // config.sp
 
 const globals = {
-    MODULES_PATH: "/some_path/modules",
+    APP_ID: "app-0001",
 }
 
 const operators = {
@@ -222,6 +222,10 @@ const operators = {
     "#": (v) => {
         return [v]
     },
+}
+
+const paths = {
+    "@modules": "../../../modules"
 }
 ```
 

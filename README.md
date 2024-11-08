@@ -239,4 +239,4 @@ Instead of creating native NodeJS functionality on the fly, Sprig also allows yo
 
 ## Documentation
 
-Head over to the official [Sprig Dogs](https://dibs.gitbook.io/sprig-docs) to learn more about Sprig!
+Head over to the official [Sprig Docs](https://dibs.gitbook.io/sprig-docs) to learn more about Sprig!

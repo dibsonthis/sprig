@@ -15,3 +15,7 @@ const operators = {
 const paths = {
     "@modules": "../modules",
 }
+
+const node = {
+    paths: ["/Users/adib/Dev/Personal/Languages/newlang-env/node_modules"]
+}

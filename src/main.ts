@@ -77,6 +77,8 @@ try {
     configVM.callFrame.symbolsArray[configVM.callFrame.variableMap.operators];
   const paths =
     configVM.callFrame.symbolsArray[configVM.callFrame.variableMap.paths];
+  const node =
+    configVM.callFrame.symbolsArray[configVM.callFrame.variableMap.node];
 
   for (const key of Object.keys(globals?.node?.value ?? {})) {
     vm.callFrame.symbols[key] = {
@@ -111,6 +113,11 @@ try {
     const: false,
     isGlobal: true,
   };
+
+  process.env.NODE_PATH = node?.node?.value?.["paths"]?.nodes
+    ?.map((e) => path.resolve(e?.value ?? ""))
+    .join(path.delimiter);
+  require("module").Module._initPaths();
 } catch (e) {}
 
 vm.evaluate();

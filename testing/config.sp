@@ -17,5 +17,5 @@ const paths = {
 }
 
 const node = {
-    paths: ["/Users/adib/Dev/Personal/Languages/newlang-env/node_modules"]
+    paths: ["../node_modules"]
 }

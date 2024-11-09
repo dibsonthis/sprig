@@ -114,9 +114,23 @@ try {
     isGlobal: true,
   };
 
-  process.env.NODE_PATH = node?.node?.value?.["paths"]?.nodes
-    ?.map((e) => path.resolve(e?.value ?? ""))
-    .join(path.delimiter);
+  const modulePaths = require("module").globalPaths;
+
+  if (process.platform === "win32") {
+    // todo: Add global node_modules path for win
+  } else {
+    modulePaths.push("/usr/local/lib/node_modules");
+  }
+
+  const providedPaths =
+    node?.node?.value?.["paths"]?.nodes?.map((e) =>
+      path.resolve(e?.value ?? "")
+    ) ?? [];
+
+  process.env.NODE_PATH = [...modulePaths, ...providedPaths].join(
+    path.delimiter
+  );
+
   require("module").Module._initPaths();
 } catch (e) {}
 

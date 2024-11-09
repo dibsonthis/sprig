@@ -27,7 +27,6 @@
     },
     "dependencies": {
         "express": "^4.21.0",
-        "object-sizeof": "^2.6.5",
         "ws": "^8.18.0"
     }
 }

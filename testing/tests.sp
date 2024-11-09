@@ -477,7 +477,7 @@ const test_core = () => {
     const avg = 5 $avg 3
     assert(isEqual, avg, 4)
     
-    // // Adding a variable
+    // Adding a variable
     Core.addVariable("__x__", 500)
     assert(isEqual, __x__, 500)
 

@@ -16,8 +16,8 @@ export class Parser {
 
   public newNode(type: NodeTypeEnum, value?): Node {
     return {
-      col: this.node.col,
-      line: this.node.line,
+      col: this.node?.col ?? 0,
+      line: this.node?.line ?? 0,
       type,
       value,
     };

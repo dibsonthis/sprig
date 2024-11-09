@@ -219,3 +219,108 @@ export const injectCommonAndModules = (
     console.warn("Warning: Encountered an error while loading builtin modules");
   }
 };
+
+export const injectConfig = (vm: VM, cwd: string) => {
+  // Config
+  try {
+    let config;
+    try {
+      config = fs.readFileSync("./config.sp").toString();
+    } catch (e) {
+      config = "";
+    }
+    const configLexer = new Lexer(config.toString(), true);
+    configLexer.tokenize();
+
+    const configParser = new Parser(configLexer.nodes, configLexer.filePath);
+    configParser.parse();
+
+    const configGenerator = new Generator(
+      configParser.nodes,
+      configParser.filePath
+    );
+
+    configGenerator.generate();
+
+    const configVM = new VM(
+      configGenerator.generatedNodes,
+      configParser.filePath
+    );
+
+    configVM.callFrame.variables = configGenerator.variables;
+    configVM.callFrame.tempVariables = configGenerator.tempVariables;
+    configVM.callFrame.variableMap = configGenerator.variableMap;
+
+    configVM.evaluate();
+
+    const globals =
+      configVM.callFrame.symbolsArray[configVM.callFrame.variableMap.globals];
+    const operators =
+      configVM.callFrame.symbolsArray[configVM.callFrame.variableMap.operators];
+    const paths =
+      configVM.callFrame.symbolsArray[configVM.callFrame.variableMap.paths];
+    const node =
+      configVM.callFrame.symbolsArray[configVM.callFrame.variableMap.node];
+
+    for (const key of Object.keys(globals?.node?.value ?? {})) {
+      vm.callFrame.symbols[key] = {
+        node: globals.node.value[key],
+        const: true,
+        isGlobal: true,
+      };
+    }
+
+    for (const key of Object.keys(operators?.node?.value ?? {})) {
+      const operation = operators.node.value[key];
+      if (operation.funcNode.params?.length == 1) {
+        vm.operators[`unary${key}`] = operation;
+      } else {
+        vm.operators[key] = operation;
+      }
+    }
+
+    for (const key of Object.keys(paths?.node?.value ?? {})) {
+      const resolvedPath = path.resolve(paths.node.value[key].value);
+      vm.paths[key] = resolvedPath;
+    }
+
+    const moduleObject = configParser.newNode(NodeTypeEnum.Object, {});
+
+    moduleObject.evaluated = true;
+
+    Object.entries(configVM.callFrame.variableMap ?? {}).forEach(
+      ([name, index]) => {
+        const symbol = configVM.callFrame.symbolsArray[index];
+        moduleObject.value[name] = symbol.node;
+      }
+    );
+
+    vm.callFrame.symbols.__config = {
+      node: moduleObject,
+      const: false,
+      isGlobal: true,
+    };
+
+    const modulePaths = require("module").globalPaths;
+
+    const localModulesPath = path.join(cwd, "node_modules");
+    modulePaths.push(localModulesPath);
+
+    if (process.platform === "win32") {
+      // todo: Add global node_modules path for win
+    } else {
+      modulePaths.push("/usr/local/lib/node_modules");
+    }
+
+    const providedPaths =
+      node?.node?.value?.["paths"]?.nodes?.map((e) =>
+        path.resolve(e?.value ?? "")
+      ) ?? [];
+
+    process.env.NODE_PATH = [...modulePaths, ...providedPaths].join(
+      path.delimiter
+    );
+
+    require("module").Module._initPaths();
+  } catch (e) {}
+};

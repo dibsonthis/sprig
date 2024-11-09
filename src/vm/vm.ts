@@ -2,7 +2,11 @@ import { Node, NodeTypeEnum, CallFrame } from "../types";
 import { Lexer } from "../lexer/lexer";
 import { Parser } from "../parser/parser";
 import { Generator } from "../generator/generator";
-import { getParamNames } from "../utils/utils";
+import {
+  getParamNames,
+  injectCommonAndModules,
+  injectConfig,
+} from "../utils/utils";
 import path from "path";
 
 const newCallFrame = (instructions = []): CallFrame => {
@@ -1946,6 +1950,8 @@ export class VM {
       const currentDirPath = process.cwd();
 
       process.chdir(path.dirname(resolvedPath));
+
+      injectConfig(vm, process.cwd());
 
       vm.evaluate();
 

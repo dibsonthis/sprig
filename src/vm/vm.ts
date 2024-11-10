@@ -2,12 +2,9 @@ import { Node, NodeTypeEnum, CallFrame } from "../types";
 import { Lexer } from "../lexer/lexer";
 import { Parser } from "../parser/parser";
 import { Generator } from "../generator/generator";
-import {
-  getParamNames,
-  injectCommonAndModules,
-  injectConfig,
-} from "../utils/utils";
+import { getParamNames, injectConfig } from "../utils/utils";
 import path from "path";
+import fs from "fs";
 
 const newCallFrame = (instructions = []): CallFrame => {
   return {
@@ -1909,9 +1906,17 @@ export class VM {
           this.paths[p]
         );
       }
-      const extName = path.extname(importFromResolved);
-      if (!extName.length) {
-        importFromResolved += ".sp";
+      const isDir =
+        fs.existsSync(importFromResolved) &&
+        fs.lstatSync(importFromResolved).isDirectory();
+
+      if (isDir) {
+        importFromResolved = path.join(importFromResolved, "index.sp");
+      } else {
+        const extName = path.extname(importFromResolved);
+        if (!extName.length) {
+          importFromResolved += ".sp";
+        }
       }
       const lexer = new Lexer(importFromResolved);
       lexer.tokenize();

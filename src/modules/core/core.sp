@@ -83,3 +83,22 @@ const removeVariable = (name) => {
 
     nativeFn(name)
 }
+
+const _getMeta = exec(`(obj) => obj.meta`)
+
+const getMeta = (obj) => {
+    return raw(obj)->_getMeta
+}
+
+const _setMeta = exec(`(obj, meta) => {
+    if (obj.meta) {
+        obj.meta = {...obj.meta, ...meta}
+    } else {
+        obj.meta = meta
+    }
+}`)
+
+const setMeta = (obj, meta) => {
+    raw(obj)->_setMeta(meta)
+    return obj
+}

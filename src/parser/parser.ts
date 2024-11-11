@@ -31,7 +31,6 @@ export class Parser {
         this.filePath
       )}': ${message}`
     );
-    process.exit();
   }
 
   private reset(index: number = 0) {
@@ -535,17 +534,19 @@ export class Parser {
         const nextNode = this.nextNode();
         if (!nextNode) {
           this.errorAndExit("Malformed const declaration");
+          return 1;
         }
         if (
           !(nextNode.type === NodeTypeEnum.Operator && nextNode.value === "=")
         ) {
           this.errorAndExit("Malformed const declaration", nextNode);
+          return 1;
         }
         const id = nextNode.left;
         const value = nextNode.right;
         if (!id || !value) {
           this.errorAndExit("Malformed const declaration", nextNode);
-          return;
+          return 1;
         }
         this.node.declNode = {
           id,
@@ -568,6 +569,7 @@ export class Parser {
         const nextNode = this.nextNode();
         if (!nextNode) {
           this.errorAndExit("Malformed var declaration");
+          return 1;
         }
 
         if (
@@ -583,7 +585,7 @@ export class Parser {
           const value = nextNode.right;
           if (!id || !value) {
             this.errorAndExit("Malformed var declaration", nextNode);
-            return;
+            return 1;
           }
           this.node.declNode = {
             id,
@@ -610,6 +612,7 @@ export class Parser {
         const nextNode = this.nextNode();
         if (!nextNode) {
           this.errorAndExit("Malformed let declaration");
+          return 1;
         }
 
         if (
@@ -625,7 +628,7 @@ export class Parser {
           const value = nextNode.right;
           if (!id || !value) {
             this.errorAndExit("Malformed let declaration", nextNode);
-            return;
+            return 1;
           }
           this.node.declNode = {
             id,
@@ -773,7 +776,10 @@ export class Parser {
     this.reset(startIndex);
     this.parseOperator("=", endToken);
     this.reset(startIndex);
-    this.parseDeclaration(endToken);
+    const res = this.parseDeclaration(endToken);
+    if (res) {
+      return res;
+    }
     this.reset(startIndex);
     this.parseModifier(endToken);
     this.reset(startIndex);

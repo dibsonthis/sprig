@@ -17,6 +17,7 @@ export class Generator {
   public variables: { id: string; type: string }[] = [];
   public tempVariables: { id: string; type: string }[] = [];
   public variableMap: Record<string, number> = {};
+  public hasError = false;
 
   private errorAndContinue(message: string, node?: Node) {
     const errorNode = node ? node : this.node;
@@ -29,7 +30,7 @@ export class Generator {
 
   private errorAndExit(message: string, node?: Node) {
     this.errorAndContinue(message, node);
-    process.exit(1);
+    this.hasError = true;
   }
 
   constructor(nodes: Node[], filePath: string = ".") {
@@ -108,6 +109,7 @@ export class Generator {
     this.generateBytecode(node.left, false, captureIds);
     if (!node.right?.node) {
       this.errorAndExit("Accessor cannot be empty");
+      return;
     }
     this.generateBytecode(node.right?.node, false, captureIds);
     this.generatedNodes.push(this.newNode(NodeTypeEnum.Accessor));
@@ -189,6 +191,7 @@ export class Generator {
                 this.errorAndExit(
                   `Const variable '${node.left.value}' cannot be re-assigned`
                 );
+                return;
               }
               this.generateBytecode(node.right, false, captureIds);
               this.generatedNodes.push(this.newNode(NodeTypeEnum.Store, index));
@@ -254,6 +257,7 @@ export class Generator {
             return;
           }
           this.errorAndExit("Malformed assignment");
+          return;
         }
         if (node.value === ".") {
           const flattened = this.flattenChildren(node, [
@@ -423,6 +427,7 @@ export class Generator {
             this.errorAndExit(
               "Ternary operator expects right hand side to be a ':'"
             );
+            return;
           }
           this.generateBytecode(node.left, false, captureIds);
           const jumpifFalse = this.newNode(NodeTypeEnum.JumpIfFalsePop);
@@ -606,6 +611,7 @@ export class Generator {
               this.errorAndExit(
                 `Variable '${node.declNode.id.value}' cannot be re-declared`
               );
+              return;
             }
             const symbolIndex = this.variables.findIndex(
               (e) => e.id === node.declNode.id.value
@@ -626,6 +632,7 @@ export class Generator {
           const flat = this.flattenChildren(node.declNode.id.node, [","]);
           if (flat.length === 0) {
             this.errorAndExit("Destructured declaration list cannot be empty");
+            return;
           }
           const destructuredList = this.newNode(NodeTypeEnum.List);
           destructuredList.nodes = flat.map((elem) => {
@@ -633,6 +640,7 @@ export class Generator {
               this.errorAndExit(
                 "Destructured declarations need to be identifiers"
               );
+              return;
             }
             // Check if variable already defined
             const symbol = this.variables.find((e) => e.id === elem.value);
@@ -641,6 +649,7 @@ export class Generator {
                 this.errorAndExit(
                   `Variable '${elem.value}' cannot be re-declared`
                 );
+                return;
               }
             } else {
               this.variableMap[elem.value] = this.variables.length;
@@ -660,6 +669,7 @@ export class Generator {
           }
           if (flat.length === 0) {
             this.errorAndExit("Destructured declaration list cannot be empty");
+            return;
           }
           const destructuredList = this.newNode(NodeTypeEnum.List);
           destructuredList.nodes = flat.map((elem) => {
@@ -667,6 +677,7 @@ export class Generator {
               this.errorAndExit(
                 "Destructured declarations need to be identifiers"
               );
+              return;
             }
             // Check if variable already defined
             const symbol = this.variables.find((e) => e.id === elem.value);
@@ -675,6 +686,7 @@ export class Generator {
                 this.errorAndExit(
                   `Variable '${elem.value}' cannot be re-declared`
                 );
+                return;
               }
             } else {
               this.variableMap[elem.value] = this.variables.length;
@@ -727,6 +739,7 @@ export class Generator {
               this.errorAndExit(
                 "Cannot provide unnamed argument after named argument"
               );
+              return;
             }
             this.generateBytecode(arg, false, captureIds);
           }
@@ -787,11 +800,13 @@ export class Generator {
         ]);
         if (forLoopSections.length < 1) {
           this.errorAndExit("Malformed for loop");
+          return;
         }
         if (forLoopSections.length > 1) {
           const valueName = forLoopSections[1];
           if (valueName.type !== NodeTypeEnum.ID) {
             this.errorAndExit("For loop variable name must be of type ID");
+            return;
           }
           tempVarIndices.push(tempVarIndices.length);
           this.tempVariables.push({ id: valueName.value, type: "let" });
@@ -802,6 +817,7 @@ export class Generator {
           const indexName = forLoopSections[2];
           if (indexName.type !== NodeTypeEnum.ID) {
             this.errorAndExit("For loop index name must be of type ID");
+            return;
           }
           tempVarIndices.push(tempVarIndices.length);
           this.tempVariables.push({ id: indexName.value, type: "let" });
@@ -898,6 +914,7 @@ export class Generator {
           }
           if (e.left.type === NodeTypeEnum.List && !e.left.node) {
             this.errorAndExit("Dynamic object property cannot be empty");
+            return;
           }
           if (e.left.type === NodeTypeEnum.String) {
             this.generatedNodes.push(e.left);
@@ -939,6 +956,7 @@ export class Generator {
               this.errorAndExit(
                 "Cannot declare catch all parameter before other parameters"
               );
+              return;
             }
             isDefault = true;
             this.generatedNodes.push(
@@ -956,6 +974,7 @@ export class Generator {
               this.errorAndExit(
                 "Cannot declare non-default parameter after default parameters"
               );
+              return;
             }
             if (
               param.type === NodeTypeEnum.Operator &&
@@ -964,6 +983,7 @@ export class Generator {
               isCatchAll = true;
               if (param.right.type !== NodeTypeEnum.ID) {
                 this.errorAndExit("Catch all param must be of an identifier");
+                return;
               }
               const catchAllParam = this.newNode(NodeTypeEnum.CatchAllParam);
               catchAllParam.value = param.right.value;
@@ -977,6 +997,7 @@ export class Generator {
                 this.errorAndExit(
                   "Cannot declare catch all parameter before other parameters"
                 );
+                return;
               }
               this.generatedNodes.push(
                 this.newNode(NodeTypeEnum.String, param.value)
@@ -990,6 +1011,11 @@ export class Generator {
         });
         // const generator = new Generator(nodes, this.filePath);
         const fnByteCode = generator.generate(true);
+
+        if (fnByteCode == -1) {
+          this.hasError = true;
+          return;
+        }
 
         if (fnByteCode.at(-1)?.type === NodeTypeEnum.Pop) {
           fnByteCode.pop();
@@ -1057,6 +1083,7 @@ export class Generator {
             flattened.forEach((e) => {
               if (e.type !== NodeTypeEnum.ID) {
                 this.errorAndExit("Import list must contain IDs");
+                return;
               }
               this.generatedNodes.push(
                 this.newNode(NodeTypeEnum.String, e.value)
@@ -1084,6 +1111,9 @@ export class Generator {
 
   public generate(captureIds = false) {
     while (this.node) {
+      if (this.hasError) {
+        return -1;
+      }
       const res = this.generateBytecode(this.node, true, captureIds);
       this.advance();
     }

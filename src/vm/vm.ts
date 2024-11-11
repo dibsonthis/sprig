@@ -34,6 +34,7 @@ export class VM {
   public filePath: string;
   public functionName: string;
   public meta: object = {};
+  public hasError = false;
 
   // flags
   public injectBuiltins: boolean;
@@ -50,7 +51,7 @@ export class VM {
 
   private errorAndExit(message: string, node?: Node) {
     this.errorAndContinue(message, node);
-    process.exit(1);
+    this.hasError = true;
   }
 
   constructor(nodes: Node[], filePath: string = ".", restricted = false) {
@@ -399,11 +400,87 @@ export class VM {
     const lexer = new Lexer(str, true);
     lexer.tokenize();
     const parser = new Parser(lexer.nodes, "eval");
-    parser.parse();
+    const parserResult = parser.parse();
+    if (parserResult) {
+      return this.newNode();
+    }
+    const generator = new Generator(parser.nodes, parser.filePath);
+    const generatorResult = generator.generate(true);
+    if (generatorResult == -1) {
+      return this.newNode();
+    }
+
+    if (generator.generatedNodes.at(-1)?.type === NodeTypeEnum.Pop) {
+      generator.generatedNodes.pop();
+    }
+
+    const evalVM = new VM(generator.generatedNodes, this.filePath);
+
+    evalVM.builtins = {
+      ...this.builtins,
+      __frame: evalVM.builtins.__frame,
+      __builtins: evalVM.builtins.__builtins,
+      exec: evalVM.builtins.exec,
+      break: evalVM.builtins.break,
+    };
+
+    evalVM.callFrame.variables = generator.variables;
+    evalVM.callFrame.tempVariables = generator.tempVariables;
+    evalVM.callFrame.variableMap = generator.variableMap;
+    evalVM.callFrame.capturedIds = generator.capturedIds;
+    evalVM.callFrame.capturedIds = new Set([
+      ...(this.callFrame.capturedIds ?? new Set<string>()),
+      ...evalVM.callFrame.capturedIds,
+    ]);
+    for (const key in this.callFrame.variableMap) {
+      const index = this.callFrame.variableMap[key];
+      const symbol = this.callFrame.symbolsArray[index];
+      evalVM.callFrame.symbols[key] = symbol;
+    }
+
+    if (env) {
+      for (const prop in env.value) {
+        evalVM.callFrame.symbols[prop] = {
+          node: env.value[prop],
+          const: false,
+        };
+      }
+    } else {
+      evalVM.callFrame.symbols = {
+        ...this.callFrame.symbols,
+        ...evalVM.callFrame.symbols,
+      };
+      evalVM.callFrame.tempVars = { ...this.callFrame.tempVars };
+      evalVM.callFrame.symbolsArray = [...this.callFrame.symbolsArray];
+      evalVM.callFrame.tempVarsArray = this.callFrame.tempVarsArray;
+    }
+
+    const res = evalVM.evaluate();
+
+    for (const key in evalVM.callFrame.variableMap) {
+      const index = evalVM.callFrame.variableMap[key];
+      const symbol = evalVM.callFrame.symbolsArray[index];
+      this.callFrame.symbols[key] = symbol;
+    }
+
+    return res;
+  }
+
+  private evalInline(str: string) {
+    const lexer = new Lexer(str, true);
+    lexer.tokenize();
+    const parser = new Parser(lexer.nodes, "eval");
+    const parserResult = parser.parse();
+    if (parserResult) {
+      return this.newNode();
+    }
     const generator = new Generator(parser.nodes, parser.filePath);
     generator.variables = this.callFrame.variables;
     generator.tempVariables = this.callFrame.tempVariables;
-    generator.generate(true);
+    const generatorResult = generator.generate(true);
+    if (generatorResult == -1) {
+      return this.newNode();
+    }
 
     if (generator.generatedNodes.at(-1)?.type === NodeTypeEnum.Pop) {
       generator.generatedNodes.pop();
@@ -436,18 +513,13 @@ export class VM {
       evalFrame.symbols[variable.id] = variable;
     });
 
-    if (env) {
-      for (const prop in env.value) {
-        evalFrame.symbols[prop] = { node: env.value[prop], const: false };
-      }
-    } else {
-      evalFrame.symbols = {
-        ...this.callFrame.symbols,
-        ...evalFrame.symbols,
-      };
-      evalFrame.tempVars = this.callFrame.tempVars;
-      evalFrame.symbolsArray = this.callFrame.symbolsArray;
-    }
+    evalFrame.symbols = {
+      ...this.callFrame.symbols,
+      ...evalFrame.symbols,
+    };
+
+    evalFrame.tempVars = this.callFrame.tempVars;
+    evalFrame.symbolsArray = this.callFrame.symbolsArray;
 
     this.advance();
     this.callFrames.push(evalFrame);
@@ -622,8 +694,8 @@ export class VM {
         );
       }
 
-      this.eval(node.value, env);
-      return;
+      const res = this.eval(node.value, env);
+      return res;
     },
     loadLib: (args: Node[]) => {
       if (args.length !== 1) {
@@ -1127,6 +1199,7 @@ export class VM {
       if (!this.callFrame.instruction) {
         // We've gone too far back
         this.errorAndExit("Break count exceeds number of loops", node);
+        return;
       }
       if (
         this.callFrame.instruction.type === NodeTypeEnum.StartForLoop ||
@@ -1162,18 +1235,44 @@ export class VM {
     node.forLoopStartNode.count++;
 
     if (!node.forLoopStartNode.arr) {
-      var arr = this.callFrame.stack.pop();
-      if (!arr) {
+      if (!this.callFrame.stack.at(-1)) {
         this.errorAndExit("For loops must have a valid array");
+        node.forLoopStartNode.count = -1;
+        node.forLoopStartNode.arr = undefined;
+        if (node.forLoopStartNode.valueName) {
+          this.callFrame.tempVarsArray.pop();
+        }
+        if (node.forLoopStartNode.indexName) {
+          this.callFrame.tempVarsArray.pop();
+        }
+        return;
       }
+      var arr = this.callFrame.stack.pop();
       if (arr.type === NodeTypeEnum.Undefined) {
         this.errorAndExit("For loops must have a valid array");
+        node.forLoopStartNode.count = -1;
+        node.forLoopStartNode.arr = undefined;
+        if (node.forLoopStartNode.valueName) {
+          this.callFrame.tempVarsArray.pop();
+        }
+        if (node.forLoopStartNode.indexName) {
+          this.callFrame.tempVarsArray.pop();
+        }
+        return;
       }
       if (arr.type === NodeTypeEnum.ID) {
         arr = this.evaluateID(arr);
         if (arr.type === NodeTypeEnum.Error) {
           this.errorAndExit(arr.value);
-          return this.newNode();
+          node.forLoopStartNode.count = -1;
+          node.forLoopStartNode.arr = undefined;
+          if (node.forLoopStartNode.valueName) {
+            this.callFrame.tempVarsArray.pop();
+          }
+          if (node.forLoopStartNode.indexName) {
+            this.callFrame.tempVarsArray.pop();
+          }
+          return;
         }
       }
       node.forLoopStartNode.arr = arr.nodes;
@@ -1181,6 +1280,15 @@ export class VM {
 
     if (!node.forLoopStartNode.arr) {
       this.errorAndExit("For loops must have a valid array");
+      node.forLoopStartNode.count = -1;
+      node.forLoopStartNode.arr = undefined;
+      if (node.forLoopStartNode.valueName) {
+        this.callFrame.tempVarsArray.pop();
+      }
+      if (node.forLoopStartNode.indexName) {
+        this.callFrame.tempVarsArray.pop();
+      }
+      return;
     }
 
     if (node.forLoopStartNode.count >= node.forLoopStartNode.arr.length) {
@@ -1476,11 +1584,13 @@ export class VM {
                 schemaProp
               )} but was provided with value of type ${valueType}`
             );
+            return;
           }
         } else if (schemaProp.value !== valueType) {
           this.errorAndExit(
             `Function '${fnName}' expects parameter '${key}' to be of type ${schemaProp.value} but was provided with value of type ${valueType}`
           );
+          return;
         }
       });
     }
@@ -1894,7 +2004,7 @@ export class VM {
       return;
     },
     [NodeTypeEnum.Eval]: (node: Node) => {
-      this.eval(node.value);
+      this.evalInline(node.value);
       return;
     },
     [NodeTypeEnum.Import]: (node: Node) => {
@@ -2542,6 +2652,14 @@ export class VM {
   public evaluate() {
     global._vm = this;
     while (true) {
+      if (this.hasError) {
+        this.hasError = false;
+        this.callFrames.splice(1);
+        this.callFrame = this.callFrames[0];
+        this.callFrame.index = -1;
+        this.resetLoops();
+        return this.newNode();
+      }
       while (!this.callFrame.instruction) {
         if (this.callFrame.parentFrame) {
           const result = this.callFrame.stack.pop() ?? this.newNode();

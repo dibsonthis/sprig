@@ -44,16 +44,6 @@ export class Lexer {
   public filePath: string;
   public nodes: Node[] = [];
 
-  private errorAndExit(message: string) {
-    console.error(
-      "\x1b[31m%s\x1b[0m",
-      `Error at (${this.line}:${this.col}) in '${path.resolve(
-        this.filePath
-      )}': ${message}`
-    );
-    process.exit();
-  }
-
   private errorAndContinue(message: string) {
     console.error(
       "\x1b[31m%s\x1b[0m",

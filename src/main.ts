@@ -3,8 +3,6 @@ import { Parser } from "./parser/parser";
 import { Generator } from "./generator/generator";
 import { VM } from "./vm/vm";
 import path from "path";
-import fs from "fs";
-import { NodeTypeEnum } from "./types";
 import { injectCommonAndModules, injectConfig } from "./utils/utils";
 
 const debug = false;
@@ -23,28 +21,32 @@ lexer.tokenize();
 
 const parser = new Parser(lexer.nodes, lexer.filePath);
 parser.filePath = path.basename(parser.filePath);
-parser.parse();
+var parserResult = parser.parse();
 
-const generator = new Generator(parser.nodes, parser.filePath);
-generator.generate();
+if (!parserResult) {
+  const generator = new Generator(parser.nodes, parser.filePath);
+  const generatorResult = generator.generate();
 
-const vm = new VM(generator.generatedNodes, parser.filePath);
-vm.callFrame.variables = generator.variables;
-vm.callFrame.tempVariables = generator.tempVariables;
-vm.callFrame.variableMap = generator.variableMap;
-vm.callFrame.name = "main";
+  if (generatorResult !== -1) {
+    const vm = new VM(generator.generatedNodes, parser.filePath);
+    vm.callFrame.variables = generator.variables;
+    vm.callFrame.tempVariables = generator.tempVariables;
+    vm.callFrame.variableMap = generator.variableMap;
+    vm.callFrame.name = "main";
 
-const commonPath = debug
-  ? path.resolve("common.sp")
-  : path.join(__dirname, "common.sp");
+    const commonPath = debug
+      ? path.resolve("common.sp")
+      : path.join(__dirname, "common.sp");
 
-const modulesPath = path.join(__dirname, "modules");
+    const modulesPath = path.join(__dirname, "modules");
 
-injectCommonAndModules(vm, commonPath, modulesPath);
+    injectCommonAndModules(vm, commonPath, modulesPath);
 
-process.chdir(path.dirname(filePath));
+    process.chdir(path.dirname(filePath));
 
-// Config
-injectConfig(vm, process.cwd());
+    // Config
+    injectConfig(vm, process.cwd());
 
-vm.evaluate();
+    vm.evaluate();
+  }
+}

@@ -92,14 +92,22 @@ export const injectCommonAndModules = (
     commonLexer.tokenize();
 
     const commonParser = new Parser(commonLexer.nodes, commonLexer.filePath);
-    commonParser.parse();
+    const parserResult = commonParser.parse();
+
+    if (parserResult) {
+      return;
+    }
 
     const commonGenerator = new Generator(
       commonParser.nodes,
       commonParser.filePath
     );
 
-    commonGenerator.generate();
+    const generatorResult = commonGenerator.generate();
+
+    if (generatorResult == -1) {
+      return;
+    }
 
     const commonVM = new VM(
       commonGenerator.generatedNodes,
@@ -166,13 +174,21 @@ export const injectCommonAndModules = (
       moduleLexer.tokenize();
 
       const moduleParser = new Parser(moduleLexer.nodes, moduleLexer.filePath);
-      moduleParser.parse();
+      const moduleParserResult = moduleParser.parse();
+
+      if (moduleParserResult) {
+        return;
+      }
 
       const moduleGenerator = new Generator(
         moduleParser.nodes,
         moduleParser.filePath
       );
-      moduleGenerator.generate();
+      const moduleGeneratorResult = moduleGenerator.generate();
+
+      if (moduleParserResult == -1) {
+        return;
+      }
 
       const moduleVM = new VM(
         moduleGenerator.generatedNodes,
@@ -233,14 +249,22 @@ export const injectConfig = (vm: VM, cwd: string) => {
     configLexer.tokenize();
 
     const configParser = new Parser(configLexer.nodes, configLexer.filePath);
-    configParser.parse();
+    const parserResult = configParser.parse();
+
+    if (parserResult) {
+      return;
+    }
 
     const configGenerator = new Generator(
       configParser.nodes,
       configParser.filePath
     );
 
-    configGenerator.generate();
+    const generatorResult = configGenerator.generate();
+
+    if (generatorResult == -1) {
+      return;
+    }
 
     const configVM = new VM(
       configGenerator.generatedNodes,

@@ -7,7 +7,6 @@ const instanceOf = (value, constructor) => {
 
 // List Functions
 
-// {arr: List}
 const includes = (arr, value) => {
     for (arr, v) {
         if (v == value) {
@@ -17,14 +16,12 @@ const includes = (arr, value) => {
     return false
 }
 
-// {arr: List, fn: Function}
 const forEach = (arr, fn) => {
     for (arr, value, index) {
         fn(value, index)
     }
 }
 
-// {arr: List, fn: Function}
 const map = (arr, fn) => {
     const res = []
     for (arr, value, index) {
@@ -33,7 +30,6 @@ const map = (arr, fn) => {
     return res
 }
 
-// {arr: List, fn: Function}
 const filter = (arr, fn) => {
     const res = []
     for (arr, value, index) {
@@ -44,7 +40,6 @@ const filter = (arr, fn) => {
     return res
 }
 
-// {arr: List, fn: Function}
 const reduce = (arr, fn, init) => {
     var res = arr[0]
     var index = 1
@@ -59,13 +54,20 @@ const reduce = (arr, fn, init) => {
     return res
 }
 
-{arr: List, start: Number, end: [Number, Undefined]}
 const slice = (arr, start, end) => {
     var _end = end
     if (!end) {
         _end = arr->length
     }
     return ((arr | _end)[0] | start)[1]
+}
+
+const _sort = exec(`(arr, fn) => {
+    return arr.toSorted((a, b) => fn(_vm.nodeToJS(a), _vm.nodeToJS(b))).map((e) => _vm.nodeToJS(e))
+}`)
+
+const sort = (arr, fn) => {
+    return arr->map((e) => raw(e))->_sort(fn)
 }
 
 // Async Functions

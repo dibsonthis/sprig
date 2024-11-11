@@ -40,6 +40,7 @@ if (!parserResult) {
 
     const modulesPath = path.join(__dirname, "modules");
 
+    // Common + Modules
     injectCommonAndModules(vm, commonPath, modulesPath);
 
     process.chdir(path.dirname(filePath));

@@ -338,6 +338,8 @@ export class Lexer {
 
     if (
       lastNode?.type === NodeTypeEnum.Modifier ||
+      lastNode?.type === NodeTypeEnum.Return ||
+      lastNode?.type === NodeTypeEnum.Yield ||
       (lastNode?.type === NodeTypeEnum.Operator &&
         ![")", "]", "}"].includes(lastNode.value)) ||
       this.nodes.length === 0
@@ -388,6 +390,8 @@ export class Lexer {
 
     if (
       lastNode?.type === NodeTypeEnum.Modifier ||
+      lastNode?.type === NodeTypeEnum.Return ||
+      lastNode?.type === NodeTypeEnum.Yield ||
       (lastNode?.type === NodeTypeEnum.Operator &&
         ![")", "]", "}"].includes(lastNode.value)) ||
       this.nodes.length === 0
@@ -425,43 +429,6 @@ export class Lexer {
           }
         }
       }
-      // for (let key of [...configOperationKeys, ...configModifierKeys]) {
-      //   const isModifier = key.substring(0, 4) === "mod_";
-      //   isModifier && (key = key.substring(4));
-      //   if (this.char === key[0]) {
-      //     const substr = this.source.substring(
-      //       this.index,
-      //       this.index + key.length
-      //     );
-      //     if (substr === key) {
-      //       const node: Node = {
-      //         type: isModifier ? NodeTypeEnum.Modifier : NodeTypeEnum.Operator,
-      //         value: key,
-      //         line: this.line,
-      //         col: this.col,
-      //       };
-
-      //       const lastNode = this.nodes.at(-1);
-
-      //       if (
-      //         lastNode?.type === NodeTypeEnum.Modifier ||
-      //         (lastNode?.type === NodeTypeEnum.Operator &&
-      //           ![")", "]", "}"].includes(lastNode.value)) ||
-      //         this.nodes.length === 0
-      //       ) {
-      //         node.meta = {
-      //           unary: true,
-      //         };
-      //       }
-
-      //       this.nodes.push(node);
-      //       for (let i = 0; i < key.length; i++) {
-      //         this.advance();
-      //       }
-      //       break;
-      //     }
-      //   }
-      // }
       for (let key of this.multiOperators) {
         const isModifier = key.substring(0, 4) === "mod_";
         isModifier && (key = key.substring(4));

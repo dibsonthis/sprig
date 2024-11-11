@@ -252,6 +252,7 @@ export class Parser {
         if (op === "=>") {
           this.node.type = NodeTypeEnum.Function;
         }
+
         this.node.left = this.nodes[this.index - 1];
         const nextNode = this.nextNode();
         if (

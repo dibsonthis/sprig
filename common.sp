@@ -66,7 +66,8 @@ const _sort = exec(`(arr, fn) => {
     return arr.toSorted((a, b) => fn(_vm.nodeToJS(a), _vm.nodeToJS(b))).map((e) => _vm.nodeToJS(e))
 }`)
 
-const sort = (arr, fn) => {
+const sort = (arr, fn = (a, b) => a - b) => {
+    print(fn)
     return arr->map((e) => raw(e))->_sort(fn)
 }
 

@@ -504,6 +504,16 @@ const test_config = () => {
     assert(isEqual, __config->length, 4)
 }
 
+const test_common_functions = () => {
+
+    const arr = [5, 1, 3, 40, 2]
+    const num = 4.45432
+
+    const sortedArr = arr->sort
+    assert(isEqual, sortedArr[0], 1)
+    assert(isEqual, truncate(num), 4.45)
+}
+
 const tests = getLocalTests()
 
 Test.run(...tests)

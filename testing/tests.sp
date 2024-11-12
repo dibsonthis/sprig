@@ -472,6 +472,8 @@ const test_this = () => {
 
 const test_core = () => {
 
+    const { setMeta, getMeta } = Core
+
     // Adding an operator
     Core.addOperator("$avg", (a, b) => (a + b) / 2)
     const avg = 5 $avg 3
@@ -491,6 +493,27 @@ const test_core = () => {
     Core.resetBuiltin("asList")
     const fn = exec(`_vm.builtins.asList`)
     assert(isEqual, fn, undefined)
+
+    // Setting Metadata
+
+    const user = {
+        name: "Alice",
+    }
+
+    const pUser = user->proxy({
+        set: {
+            _: (o, k, v, c) => {
+                o->setMeta({
+                    modified: true
+                })
+                return v
+            }
+        }
+    })
+
+    pUser.age = 34
+
+    assert(isEqual, (pUser->getMeta).modified, true)
 }
 
 const test_config = () => {

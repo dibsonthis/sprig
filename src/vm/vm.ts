@@ -1522,8 +1522,12 @@ export class VM {
       }
     }
 
-    if (fnName && !frame.symbols[fnName]) {
-      frame.symbols[fnName] = { node: fn, const: false };
+    // if (fnName && !frame.symbols[fnName]) {
+    //   frame.symbols[fnName] = { node: fn, const: false };
+    // }
+
+    if (fn.funcNode?.name && !frame.symbols[fn.funcNode?.name]) {
+      frame.symbols[fn.funcNode.name] = { node: fn, const: false };
     }
 
     fn.funcNode.params.forEach((param, index) => {

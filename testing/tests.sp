@@ -537,6 +537,27 @@ const test_common_functions = () => {
     assert(isEqual, truncate(num), 4.45)
 }
 
+const test_currying = () => {
+    const curried = (fn) => {
+        const numParams = (fn->inspect).params->length
+        const arguments = []
+        const curry = (...args) => {
+            for (args, arg) {
+                arguments->append(arg)
+                if (arguments->length >= numParams) {
+                    return fn(...arguments)
+                }
+            }
+            return curry
+        }
+        return curry
+    }
+    
+    const add = curried((a, b) => a + b)
+    
+    assert(isEqual, add(10)(20), 30)
+}
+
 const tests = getLocalTests()
 
 Test.run(...tests)

@@ -67,7 +67,6 @@ const _sort = exec(`(arr, fn) => {
 }`)
 
 const sort = (arr, fn = (a, b) => a - b) => {
-    print(fn)
     return arr->map((e) => raw(e))->_sort(fn)
 }
 

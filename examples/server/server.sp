@@ -9,7 +9,7 @@ app->use(Server.encodings.json())
 
 app->get("/", (req, res) => {
     print("Visited: /")
-    res->send(`<h1 onclick="console.log('hello')"> Hello World </h1>`)
+    res->send('<h1 onclick="console.log(`hello`)"> Hello World </h1>')
 })
 
 app->get("/users/:id", (req, res) => {
@@ -26,10 +26,12 @@ app->get("/users/:id", (req, res) => {
 
 app->post("/data", (req, res) => {
     const body = (req->value).body
+    const keys = body->keys
     res->send({
-        keys: body->keys, 
+        keys, 
         values: (body->inspect).values,
-        length: body->length
+        length: body->length,
+        hasId: keys->includes("id")
     })
 })
 

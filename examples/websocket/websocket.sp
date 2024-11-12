@@ -10,7 +10,7 @@ var price;
 var lastPrice;
 var secondLastPrice;
 
-interval(() => {
+const intervalId = interval(() => {
     secondLastPrice = lastPrice
     lastPrice = price
     const diff = (lastPrice - secondLastPrice)->truncate(3)
@@ -36,4 +36,5 @@ wsc->on("message", (e) => {
 
 wsc->on("close", (e) => {
     print("Closing connection")
+    clearInterval(intervalId)
 })

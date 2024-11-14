@@ -227,11 +227,13 @@ export const injectCommonAndModules = (
         const: false,
         isGlobal: true,
       };
-
-      vm.callFrame.symbols.__common.node.value[moduleNameMap[moduleName]] =
-        vm.callFrame.symbols[moduleNameMap[moduleName]].node;
+      if (vm.callFrame.symbols.__common) {
+        vm.callFrame.symbols.__common.node.value[moduleNameMap[moduleName]] =
+          vm.callFrame.symbols[moduleNameMap[moduleName]].node;
+      }
     });
   } catch (e) {
+    console.warn(e);
     console.warn("Warning: Encountered an error while loading builtin modules");
   }
 };

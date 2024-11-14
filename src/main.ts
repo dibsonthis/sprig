@@ -5,7 +5,7 @@ import { VM } from "./vm/vm";
 import path from "path";
 import { injectCommonAndModules, injectConfig } from "./utils/utils";
 
-const debug = false;
+const debug = true;
 
 const filePath = debug ? "testing/tests.sp" : process.argv[2];
 
@@ -41,12 +41,12 @@ if (!parserResult) {
     const modulesPath = path.join(__dirname, "modules");
 
     // Common + Modules
-    injectCommonAndModules(vm, commonPath, modulesPath);
+    // injectCommonAndModules(vm, commonPath, modulesPath);
 
     process.chdir(path.dirname(filePath));
 
     // Config
-    injectConfig(vm, process.cwd());
+    // injectConfig(vm, process.cwd());
 
     vm.evaluate();
   }

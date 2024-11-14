@@ -80,6 +80,7 @@
 // }
 
 export enum NodeTypeEnum {
+  Any,
   ID,
   Number,
   Boolean,
@@ -335,6 +336,7 @@ export type Node = {
     capturedIds?: Set<string>;
     swapTos?: boolean;
     hiddenProp?: boolean;
+    typeAlias?: string;
   };
   evaluated?: boolean;
 };

@@ -164,6 +164,9 @@ export enum NodeTypeEnum {
   LoadSymbol,
   Store,
   AddAssign,
+
+  // Typechecking
+  TypeList,
 }
 
 export const NodeTypes = [

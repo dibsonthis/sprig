@@ -2198,6 +2198,14 @@ export class VM {
           left.value + this.toString(right)
         );
       }
+
+      if (right.type === NodeTypeEnum.String) {
+        return this.newNode(
+          NodeTypeEnum.String,
+          this.toString(left) + right.value
+        );
+      }
+
       if (left.type === NodeTypeEnum.List && right.type === NodeTypeEnum.List) {
         const newList = this.newNode(NodeTypeEnum.List);
         newList.evaluated = true;

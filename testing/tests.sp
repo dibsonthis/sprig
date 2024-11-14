@@ -562,7 +562,30 @@
 
 // Test.run(...tests)
 
-NumOrString :: Number || String
-x :: [NumOrString]
+// NumOrString :: Number || String
+// Matrix :: [[Number]]
+// matrix :: Matrix
+// // x :: [NumOrString]
 
-var x = (((1..10) + [1,2,3]) * 2) + [true]
+// // var x = ([1,2,3] + ["1", true]) * 2
+
+// const matrix = [
+//     [1, 2, 3, 4],
+//     [5, 6, 7, 8]
+// ]
+
+BoolOrNum :: Boolean || Number || String
+
+var nums = ["1", "2", "true"]
+var res = ""
+var value = true
+
+for (nums, value) {
+    for ([true, false], v) {
+        res = [value, v]
+    }
+}
+
+value = false
+
+print(value)

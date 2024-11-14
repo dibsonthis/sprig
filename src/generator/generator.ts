@@ -21,6 +21,8 @@ export class Generator {
 
   public typeMap: Record<string, Node> = {};
   public tempTypeMap: Record<string, Node> = {};
+  public returnType: Node;
+  public expectedReturnType: Node = this.newNode();
 
   private typeRepr(node: Node) {
     var repr = "";
@@ -130,6 +132,21 @@ export class Generator {
       case NodeTypeEnum.Boolean:
       case NodeTypeEnum.Undefined: {
         return node;
+      }
+      case NodeTypeEnum.Function: {
+        const flattenedFunction = this.newNode(
+          NodeTypeEnum.List,
+          "functionTypes"
+        );
+        flattenedFunction.nodes = [];
+        const params = this.flattenChildren(node.left?.node, [","]);
+        params.forEach((e) => {
+          flattenedFunction.nodes.push(this.resolveType(e));
+        });
+        flattenedFunction.nodes.push(
+          this.resolveType(node.right ?? this.newNode())
+        );
+        return flattenedFunction;
       }
       case NodeTypeEnum.Operator: {
         const left = this.resolveType(node.left);
@@ -421,12 +438,19 @@ export class Generator {
           return right.nodes?.[0] ?? this.newNode(NodeTypeEnum.Any);
         }
 
+        if (node.value === "=") {
+          return right;
+        }
+
         return this.newNode(NodeTypeEnum.Undefined);
       }
       case NodeTypeEnum.TypeList: {
         return node;
       }
       case NodeTypeEnum.List: {
+        if (node.value === "functionTypes") {
+          return node;
+        }
         const typeList = this.newNode(NodeTypeEnum.List);
         if (node.node) {
           typeList.nodes = [this.resolveType(node.node)];
@@ -447,6 +471,17 @@ export class Generator {
   }
 
   private checkTypes(type: Node, valueType: Node) {
+    if (type.type === NodeTypeEnum.TypeList && type.nodes?.length === 1) {
+      type = type.nodes[0];
+    }
+
+    if (
+      valueType.type === NodeTypeEnum.TypeList &&
+      valueType.nodes?.length === 1
+    ) {
+      valueType = valueType.nodes[0];
+    }
+
     if (type.type === NodeTypeEnum.Any || valueType.type === NodeTypeEnum.Any) {
       return true;
     }
@@ -529,8 +564,8 @@ export class Generator {
     value?: any
   ): Node {
     return {
-      col: this.node.col,
-      line: this.node.line,
+      col: this.node?.col ?? 0,
+      line: this.node?.line ?? 0,
       type,
       value,
       evaluated: false,
@@ -1130,17 +1165,25 @@ export class Generator {
           if (this.typeMap.hasOwnProperty(node.declNode.id.value)) {
             // check if value matches type
             const type = this.resolveType(this.typeMap[node.declNode.id.value]);
-            const valueType = this.resolveType(node.declNode.value);
-            if (symbol && node.value === "let" && symbol.type === "let") {
-              this.typeMap[node.declNode.id.value] = valueType;
-            } else {
-              if (!this.checkTypes(type, valueType)) {
-                this.errorAndExit(
-                  `TypeError: Expected type ${this.typeRepr(
-                    type
-                  )} but received type ${this.typeRepr(valueType)}`
-                );
-                return;
+            // Don't evaluate real functions
+            if (
+              !(
+                type.type === NodeTypeEnum.List &&
+                type.value === "functionTypes"
+              )
+            ) {
+              const valueType = this.resolveType(node.declNode.value);
+              if (symbol && node.value === "let" && symbol.type === "let") {
+                this.typeMap[node.declNode.id.value] = valueType;
+              } else {
+                if (!this.checkTypes(type, valueType)) {
+                  this.errorAndExit(
+                    `TypeError: Expected type ${this.typeRepr(
+                      type
+                    )} but received type ${this.typeRepr(valueType)}`
+                  );
+                  return;
+                }
               }
             }
           } else {
@@ -1480,6 +1523,16 @@ export class Generator {
         const params = this.flattenChildren(node.left.node, [","]);
         var isDefault = false;
         var isCatchAll = false;
+        const resolvedFunction = this.resolveType(
+          this.newNode(NodeTypeEnum.ID, node.meta?.name ?? "")
+        );
+        if (params.length !== resolvedFunction.nodes?.length - 1) {
+          this.errorAndExit(
+            `Mismatch between type and function implementation - type expects ${
+              resolvedFunction.nodes?.length - 1
+            } parameter(s) but implementation has ${params.length}`
+          );
+        }
         params.forEach((param, index) => {
           if (param.type === NodeTypeEnum.Operator && param.value === "=") {
             if (isCatchAll) {
@@ -1496,6 +1549,19 @@ export class Generator {
             const variableIndex = generator.variables.length;
             generator.variableMap[param.left.value] = variableIndex;
             generator.variables.push({ id: param.left.value, type: "let" });
+
+            // insert param type into generator
+            const paramType = resolvedFunction.nodes?.[index] ?? this.newNode();
+            const defaultValueType = this.resolveType(param.right);
+            if (!this.checkTypes(paramType, defaultValueType)) {
+              this.errorAndExit(
+                `TypeError: Expected parameter type ${this.typeRepr(
+                  paramType
+                )} but received type ${this.typeRepr(defaultValueType)}`
+              );
+              return;
+            }
+            generator.typeMap[param.left.value] = paramType;
 
             this.generateBytecode(param.right, false, captureIds);
             this.generatedNodes.push(this.newNode(NodeTypeEnum.DefaultParam));
@@ -1533,14 +1599,29 @@ export class Generator {
                 this.newNode(NodeTypeEnum.String, param.value)
               );
 
+              // insert param type into generator
+              generator.typeMap[param.value] =
+                resolvedFunction.nodes?.[index] ?? this.newNode();
+
               const variableIndex = generator.variables.length;
               generator.variableMap[param.value] = variableIndex;
               generator.variables.push({ id: param.value, type: "let" });
             }
           }
         });
-        // const generator = new Generator(nodes, this.filePath);
+
+        generator.expectedReturnType = resolvedFunction.nodes?.at(-1);
         const fnByteCode = generator.generate(true);
+
+        if (
+          !this.checkTypes(generator.expectedReturnType, generator.returnType)
+        ) {
+          this.errorAndExit(
+            `TypeError: Expected return type ${this.typeRepr(
+              generator.expectedReturnType
+            )} but received type ${this.typeRepr(generator.returnType)}`
+          );
+        }
 
         if (fnByteCode == -1) {
           this.hasError = true;
@@ -1574,12 +1655,26 @@ export class Generator {
       case NodeTypeEnum.Return: {
         this.generateBytecode(node.right, false, captureIds);
         this.generatedNodes.push(this.newNode(NodeTypeEnum.Return));
+        // add return type
+        const returnType = this.resolveType(node.right);
+        if (this.returnType) {
+          this.returnType = this.joinTypes(this.returnType, returnType);
+        } else {
+          this.returnType = returnType;
+        }
         return;
       }
       case NodeTypeEnum.Yield: {
         this.generateBytecode(node.right, false, captureIds);
         this.generatedNodes.push(this.newNode(NodeTypeEnum.Yield));
         this.isCoroutine = true;
+        // add return type
+        const returnType = this.resolveType(node.right);
+        if (this.returnType) {
+          this.returnType = this.joinTypes(this.returnType, returnType);
+        } else {
+          this.returnType = returnType;
+        }
         return;
       }
       case NodeTypeEnum.Break: {
@@ -1649,6 +1744,12 @@ export class Generator {
     }
     if (this.hasError) {
       return -1;
+    }
+    const returnType = this.resolveType(this.nodes.at(-1));
+    if (this.returnType) {
+      this.returnType = this.joinTypes(this.returnType, returnType);
+    } else {
+      this.returnType = returnType;
     }
     return this.generatedNodes;
   }

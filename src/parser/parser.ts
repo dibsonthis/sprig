@@ -255,6 +255,17 @@ export class Parser {
 
         this.node.left = this.nodes[this.index - 1];
         const nextNode = this.nextNode();
+
+        if (
+          op === "=" &&
+          nextNode.type === NodeTypeEnum.Function &&
+          this.node.left?.type === NodeTypeEnum.ID
+        ) {
+          nextNode.meta = {
+            name: this.node?.left?.value,
+          };
+        }
+
         if (
           !(
             this.node.value === "," &&
@@ -263,6 +274,12 @@ export class Parser {
           )
         ) {
           this.node.right = this.nodes[this.index + 1];
+          if (
+            this.node.type === NodeTypeEnum.Function &&
+            this.node.right.type === NodeTypeEnum.Object
+          ) {
+            this.node.right = this.newNode(NodeTypeEnum.Undefined);
+          }
           this.nodes.splice(this.index + 1, 1);
         }
 

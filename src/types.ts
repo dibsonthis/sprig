@@ -340,6 +340,7 @@ export type Node = {
     swapTos?: boolean;
     hiddenProp?: boolean;
     typeAlias?: string;
+    name?: string;
   };
   evaluated?: boolean;
 };

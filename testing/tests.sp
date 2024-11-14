@@ -562,30 +562,17 @@
 
 // Test.run(...tests)
 
-// NumOrString :: Number || String
-// Matrix :: [[Number]]
-// matrix :: Matrix
-// // x :: [NumOrString]
+Matrix :: [[Number]]
+matrix :: Matrix
 
-// // var x = ([1,2,3] + ["1", true]) * 2
+const matrix = [
+    [1, 2, 3, 4],
+    [5, 6, 7, 8]
+]
 
-// const matrix = [
-//     [1, 2, 3, 4],
-//     [5, 6, 7, 8]
-// ]
+// Adder :: (Number) => Number
+// add :: Adder
 
-BoolOrNum :: Boolean || Number || String
-
-var nums = ["1", "2", "true"]
-var res = ""
-var value = true
-
-for (nums, value) {
-    for ([true, false], v) {
-        res = [value, v]
-    }
+const add = (a, b) => {
+    return [1, ""]
 }
-
-value = false
-
-print(value)

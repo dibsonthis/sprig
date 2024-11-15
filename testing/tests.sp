@@ -569,14 +569,73 @@
 //     return [[a, b], [a, b]]
 // }
 
-NumFunc :: (Number, Number) => Number
-StrFunc :: (String, String) => String
-add :: NumFunc || StrFunc
-const add = (a, b) => a + b
-
-var a = add(1, 2)
-a = true
-
 // var m = matrix(10, 20)
 // m = matrix(100, 200)
 // print(m)
+
+// forEach :: ([Any], (Any, Number) => Any) => Undefined
+
+// const forEach = (arr, fn) => {
+//     for (arr, value, index) {
+//         fn(value, index)
+//     }
+// }
+
+// add :: (Number, Number) => String
+
+// const add = (a, b) => a + b
+
+// var g = add(10, 20)
+// g = "hi"
+
+// exec :: (String) => Any
+// eval :: (String) => Any
+// print :: (...Any) => Undefined
+// println :: (...Any) => Undefined
+// length :: (Any) => Number
+// raw :: (Any) => Raw
+// keys :: (Any) => [String]
+// value :: (Raw) => Any
+// error :: (String) => Error
+// exit :: (Number || Undefined) => Undefined
+// dis :: (Function) => String
+// break :: (Number) => String
+// out :: (Any) => Any
+// type :: (Any) => String
+// class :: (Any) => Function || Native || Undefined
+// append :: ([Any], Any) => [Any]
+// insert :: ([Any], Any, Number) => [Any]
+// pop :: ([Any]) => Any
+// popf :: ([Any]) => Any
+// remove :: ([Any], Number) => [Any]
+
+// print(1, true)
+// exec(100)
+// print(length(1..10))
+// var g = raw(100)
+// value(g)
+
+// sort :: ([Any], (Any, Any) => Number) => [Any]
+
+// const _sort = exec("")
+
+// const sort = (arr, fn = (a, b) => a - b) => {
+//     return _sort(arr, fn)
+// }
+
+// var g = sort(1..10, (a, b) => {
+//     if (a < b) {
+//         return -1
+//     } else {
+//         return 1
+//     }
+// })
+
+// g = 1
+
+id :: (T) => T
+
+const id = (x) => x
+
+var x = id(100)
+x = "jack"

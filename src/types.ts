@@ -167,6 +167,7 @@ export enum NodeTypeEnum {
 
   // Typechecking
   TypeList,
+  Generic,
 }
 
 export const NodeTypes = [
@@ -276,7 +277,8 @@ export type FuncNode = {
   name?: string;
   params: Node[];
   body: Node;
-  paramTypes?: Record<string, Node>;
+  paramTypes?: Node[];
+  paramReqs?: boolean[];
   closures?: SymbolTable;
   defaults?: {};
   originFilePath?: string;
@@ -345,6 +347,7 @@ export type Node = {
   };
   evaluated?: boolean;
   isType?: boolean;
+  isGeneric?: boolean;
 };
 
 export type NodePayload = {

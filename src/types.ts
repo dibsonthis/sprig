@@ -276,6 +276,7 @@ export type FuncNode = {
   name?: string;
   params: Node[];
   body: Node;
+  paramTypes?: Record<string, Node>;
   closures?: SymbolTable;
   defaults?: {};
   originFilePath?: string;
@@ -343,6 +344,7 @@ export type Node = {
     name?: string;
   };
   evaluated?: boolean;
+  isType?: boolean;
 };
 
 export type NodePayload = {

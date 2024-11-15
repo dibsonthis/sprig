@@ -562,17 +562,21 @@
 
 // Test.run(...tests)
 
-Matrix :: [[Number]]
-matrix :: Matrix
+// Matrix :: [[Number]]
+// matrix :: (Number, Number) => Matrix
 
-const matrix = [
-    [1, 2, 3, 4],
-    [5, 6, 7, 8]
-]
+// const matrix = (a, b) => {
+//     return [[a, b], [a, b]]
+// }
 
-// Adder :: (Number) => Number
-// add :: Adder
+NumFunc :: (Number, Number) => Number
+StrFunc :: (String, String) => String
+add :: NumFunc || StrFunc
+const add = (a, b) => a + b
 
-const add = (a, b) => {
-    return [1, ""]
-}
+var a = add(1, 2)
+a = true
+
+// var m = matrix(10, 20)
+// m = matrix(100, 200)
+// print(m)

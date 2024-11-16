@@ -1,5 +1,6 @@
 import { Lexer } from "./lexer/lexer";
 import { Parser } from "./parser/parser";
+import { TypeChecker } from "./typechecker/typechecker";
 import { Generator } from "./generator/generator";
 import { VM } from "./vm/vm";
 import path from "path";
@@ -24,7 +25,15 @@ parser.filePath = path.basename(parser.filePath);
 var parserResult = parser.parse();
 
 if (!parserResult) {
+  const typechecker = new TypeChecker(parser.nodes, parser.filePath);
+  const tc = typechecker.run();
+  if (tc === -1) {
+    // todo: change
+    process.exit();
+  }
+
   const generator = new Generator(parser.nodes, parser.filePath);
+  generator.typeMap = typechecker.typeMap;
   const generatorResult = generator.generate();
 
   if (generatorResult !== -1) {

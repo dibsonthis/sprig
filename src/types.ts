@@ -317,7 +317,6 @@ export type ForLoopStartNode = {
 };
 
 export type Node = {
-  // type: NodeType;
   type: NodeTypeEnum;
   left?: Node;
   right?: Node;

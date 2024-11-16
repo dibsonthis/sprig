@@ -573,7 +573,7 @@
 // m = matrix(100, 200)
 // print(m)
 
-// forEach :: ([Any], (Any, Number) => Any) => Undefined
+// // forEach :: ([Any], (Any, Number) => Any) => Undefined
 
 // const forEach = (arr, fn) => {
 //     for (arr, value, index) {
@@ -652,8 +652,44 @@
 
 // var f = numMap([1, 2], inner)
 
-// f = "1..10"
+// f = ["1..10"]
 
-back :: ([T]) => [T]
-const back = (arr) => arr
-back(1..10)
+// back :: ([T]) => T
+// const back = (arr) => arr
+// back(1..10)
+
+// id :: (T) => [T]
+// const id = (value) => value
+
+// var x = id(10)
+// x = ""
+
+// var x = 100
+// x = [true]
+// print({x})
+
+
+// fn :: (Number, Number) => Number
+// const fn = (a, b) => a + b
+// var f = fn(10, 20)
+// f = true
+
+// f :: (!Number) => Number
+// const f = (n = 10) => n
+// f(1, 2)
+
+// blah :: (T, K) => T
+
+length :: ([Any]) => Number
+
+const len = (arr) => length(arr)
+
+const len2 = (arr) => len(arr)
+
+const arr = 1..10
+
+var g = len2(arr)
+
+// g = true
+
+print(g)

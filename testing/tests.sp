@@ -633,6 +633,27 @@
 
 // g = 1
 
-fn :: (Number, Number) => Number
+// stringify :: (T) => String
+// const stringify = (value) => `{{value}}`
 
-const fn = (a, b) => "a + b"
+// id :: (T) => T
+
+// blah :: (T, K) => T
+// const blah = (a, b) => b
+
+// var g = blah(10, 4)
+// g = true
+
+// numMap :: ([T], (Number) => Number) => [T]
+// const numMap = (arr, fn) => arr
+
+// inner :: (Number) => Number
+// const inner = (value) => value * 2
+
+// var f = numMap([1, 2], inner)
+
+// f = "1..10"
+
+back :: ([T]) => [T]
+const back = (arr) => arr
+back(1..10)

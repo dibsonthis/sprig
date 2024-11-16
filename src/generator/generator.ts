@@ -124,40 +124,40 @@ export class Generator {
     return newList;
   }
 
-  // private mergeFunctionTypes(left: Node, right: Node) {
-  //   if (left.type !== NodeTypeEnum.Function) {
-  //     return this.newNode(NodeTypeEnum.Error);
-  //   }
-  //   if (right.type !== NodeTypeEnum.Function) {
-  //     return this.newNode(NodeTypeEnum.Error);
-  //   }
-  //   if (left.funcNode.paramTypes.length !== left.funcNode.paramTypes.length) {
-  //     this.errorAndExit(
-  //       `Function type ${this.typeRepr(
-  //         left
-  //       )} is incompatible with type ${this.typeRepr(right)}`
-  //     );
-  //     return this.newNode(NodeTypeEnum.Error);
-  //   }
-  //   const newFunction = this.newNode(NodeTypeEnum.Function);
-  //   newFunction.funcNode = {
-  //     params: [],
-  //     paramTypes: [],
-  //     body: this.newNode(),
-  //   };
-  //   left.funcNode.paramTypes.forEach((leftParam, index) => {
-  //     const rightParam = right.funcNode.paramTypes[index];
-  //     const joinedParam = this.joinTypes(leftParam, rightParam);
-  //     newFunction.funcNode.paramTypes.push(joinedParam);
-  //     newFunction.funcNode.params.push(joinedParam);
-  //   });
+  private mergeFunctionTypes(left: Node, right: Node) {
+    if (left.type !== NodeTypeEnum.Function) {
+      return this.newNode(NodeTypeEnum.Error);
+    }
+    if (right.type !== NodeTypeEnum.Function) {
+      return this.newNode(NodeTypeEnum.Error);
+    }
+    if (left.funcNode.paramTypes.length !== left.funcNode.paramTypes.length) {
+      this.errorAndExit(
+        `Function type ${this.typeRepr(
+          left
+        )} is incompatible with type ${this.typeRepr(right)}`
+      );
+      return this.newNode(NodeTypeEnum.Error);
+    }
+    const newFunction = this.newNode(NodeTypeEnum.Function);
+    newFunction.funcNode = {
+      params: [],
+      paramTypes: [],
+      body: this.newNode(),
+    };
+    left.funcNode.paramTypes.forEach((leftParam, index) => {
+      const rightParam = right.funcNode.paramTypes[index];
+      const joinedParam = this.joinTypes(leftParam, rightParam);
+      newFunction.funcNode.paramTypes.push(joinedParam);
+      newFunction.funcNode.params.push(joinedParam);
+    });
 
-  //   newFunction.funcNode.body = this.joinTypes(
-  //     left.funcNode.body,
-  //     right.funcNode.body
-  //   );
-  //   return newFunction;
-  // }
+    newFunction.funcNode.body = this.joinTypes(
+      left.funcNode.body,
+      right.funcNode.body
+    );
+    return newFunction;
+  }
 
   private matchArgsWithFunctionType(args: Node[], fn: Node) {
     if (fn.type !== NodeTypeEnum.Function) {
@@ -204,6 +204,9 @@ export class Generator {
 
   private resolveType(node: Node) {
     switch (node.type) {
+      case NodeTypeEnum.Paren: {
+        return this.resolveType(node.node);
+      }
       case NodeTypeEnum.ID: {
         if (node.value === "Any") {
           return this.newNode(NodeTypeEnum.Any);
@@ -423,7 +426,7 @@ export class Generator {
 
         const paramNames = [];
 
-        this.flattenChildren(node.left?.node, [","]).forEach((param) => {
+        this.flattenChildren(node.left?.node, [","]).forEach((param, index) => {
           param.isType = node.isType;
           var isOptional = false;
           if (
@@ -463,9 +466,18 @@ export class Generator {
             }
           } else {
             const paramName = param.value;
-            const paramType = node.isType
-              ? this.resolveValueType(param)
-              : this.newNode(NodeTypeEnum.Any);
+            var paramType = this.resolveType(param);
+            if (paramType.type === NodeTypeEnum.Generic) {
+              // we look for the generic typename and change it
+              const fnType = this.typeMap[node.meta?.name];
+              const resolvedParam =
+                fnType?.funcNode?.paramTypes?.[index] ??
+                this.newNode(NodeTypeEnum.Any);
+              paramType = resolvedParam;
+            }
+            // const paramType = node.isType
+            //   ? this.resolveValueType(param)
+            //   : this.newNode(NodeTypeEnum.Any);
             if (!node.isType) {
               this.tempTypeMap[paramName] = paramType;
               paramNames.push(paramName);
@@ -530,6 +542,21 @@ export class Generator {
             return this.newNode(NodeTypeEnum.Error);
           }
 
+          if (fn.isGeneric && fn.value) {
+            // we need to evaluate this function with the correct types
+            const params = this.flattenChildren(fn.value.left.node, [","]);
+            const body = fn.value.right;
+            const generator = new Generator([body], this.filePath);
+            params.forEach((param: Node, index) => {
+              generator.typeMap[param.value] = args[index];
+            });
+            if (generator.generate() === -1) {
+              this.hasError = true;
+              return this.newNode(NodeTypeEnum.Error);
+            }
+            return generator.returnType;
+          }
+
           return fn.funcNode.body;
         }
         return this.newNode(NodeTypeEnum.Any);
@@ -539,6 +566,13 @@ export class Generator {
         const right = this.resolveValueType(node.right);
 
         if (left.type === NodeTypeEnum.Any || right.type === NodeTypeEnum.Any) {
+          return this.newNode(NodeTypeEnum.Any);
+        }
+
+        if (
+          left.type === NodeTypeEnum.TypeList ||
+          right.type === NodeTypeEnum.TypeList
+        ) {
           return this.newNode(NodeTypeEnum.Any);
         }
 
@@ -871,6 +905,20 @@ export class Generator {
     }
 
     if (type.type === NodeTypeEnum.Any || valueType.type === NodeTypeEnum.Any) {
+      return true;
+    }
+
+    if (
+      type.type === NodeTypeEnum.Generic &&
+      valueType.type === NodeTypeEnum.Generic
+    ) {
+      return type.value === valueType.value;
+    }
+
+    if (
+      type.type === NodeTypeEnum.Generic &&
+      ![NodeTypeEnum.List, NodeTypeEnum.Object].includes(valueType.type)
+    ) {
       return true;
     }
 
@@ -1590,6 +1638,9 @@ export class Generator {
                 return;
               }
             }
+            if (valueType.type === NodeTypeEnum.Function) {
+              this.typeMap[node.declNode.id.value].value = node.declNode.value;
+            }
           } else {
             this.typeMap[node.declNode.id.value] = this.resolveValueType(
               node.declNode.value
@@ -1932,11 +1983,11 @@ export class Generator {
           this.newNode(NodeTypeEnum.ID, node.meta?.name ?? "")
         );
 
-        // if (resolvedFunction.type === NodeTypeEnum.TypeList) {
-        //   resolvedFunction = resolvedFunction.nodes.reduce((a, b) =>
-        //     this.mergeFunctionTypes(a, b)
-        //   );
-        // }
+        if (resolvedFunction.type === NodeTypeEnum.TypeList) {
+          resolvedFunction = resolvedFunction.nodes.reduce((a, b) =>
+            this.mergeFunctionTypes(a, b)
+          );
+        }
 
         if (resolvedFunction.type === NodeTypeEnum.Function) {
           if (resolvedFunction.funcNode) {

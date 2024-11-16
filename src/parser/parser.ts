@@ -794,6 +794,8 @@ export class Parser {
     this.reset(startIndex);
     this.parseOperator("?", endToken);
     this.reset(startIndex);
+    this.parseOperator("|", endToken);
+    this.reset(startIndex);
     this.parseOperator(undefined, endToken, ["=", ",", "else"]);
     this.reset(startIndex);
     this.parseOperator("=", endToken);

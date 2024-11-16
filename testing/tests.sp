@@ -633,9 +633,6 @@
 
 // g = 1
 
-id :: (T) => T
+fn :: (Number, Number) => Number
 
-const id = (x) => x
-
-var x = id(100)
-x = "jack"
+const fn = (a, b) => "a + b"

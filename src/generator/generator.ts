@@ -39,7 +39,7 @@ export class Generator {
         return `...${this.typeRepr(node.value)}`;
       }
       case NodeTypeEnum.TypeList: {
-        repr += node.nodes?.map((node) => this.typeRepr(node)).join(" || ");
+        repr += node.nodes?.map((node) => this.typeRepr(node)).join(" | ");
         break;
       }
       case NodeTypeEnum.List: {
@@ -48,7 +48,7 @@ export class Generator {
         }
         repr +=
           "[" +
-          node.nodes?.map((node) => this.typeRepr(node)).join(" || ") +
+          node.nodes?.map((node) => this.typeRepr(node)).join(" | ") +
           "]";
         break;
       }
@@ -85,11 +85,21 @@ export class Generator {
     if (!nodes) {
       return [];
     }
-    return nodes.reduce((acc, current) => {
+    var isAny = false;
+    const res = nodes.reduce((acc, current) => {
+      if (current.type === NodeTypeEnum.Any) {
+        isAny = true;
+      }
       const exists = acc.some((item) => this.checkTypes(item, current));
       if (!exists) acc.push(current);
       return acc;
     }, [] as Node[]);
+
+    if (isAny) {
+      return [this.newNode(NodeTypeEnum.Any)];
+    }
+
+    return res;
   }
 
   private getListType(node: Node) {
@@ -193,12 +203,158 @@ export class Generator {
   }
 
   private resolveType(node: Node) {
+    switch (node.type) {
+      case NodeTypeEnum.ID: {
+        if (node.value === "Any") {
+          return this.newNode(NodeTypeEnum.Any);
+        }
+        if (this.tempTypeMap.hasOwnProperty(node.value)) {
+          return this.tempTypeMap[node.value];
+        }
+        if (this.typeMap.hasOwnProperty(node.value)) {
+          return this.typeMap[node.value];
+        }
+        const generic = this.newNode(NodeTypeEnum.Generic, node.value);
+        generic.isGeneric = true;
+        return generic;
+      }
+      case NodeTypeEnum.String: {
+        if (node.value === "Number") {
+          return this.newNode(NodeTypeEnum.Number);
+        }
+        if (node.value === "Boolean") {
+          return this.newNode(NodeTypeEnum.Boolean);
+        }
+        if (node.value === "List") {
+          const anyList = this.newNode(NodeTypeEnum.List);
+          return anyList;
+        }
+        if (node.value === "Object") {
+          return this.newNode(NodeTypeEnum.Object);
+        }
+        if (node.value === "Raw") {
+          return this.newNode(NodeTypeEnum.Raw);
+        }
+        if (node.value === "Function") {
+          return this.newNode(NodeTypeEnum.Function);
+        }
+        if (node.value === "Error") {
+          return this.newNode(NodeTypeEnum.Error);
+        }
+        if (node.value === "Undefined") {
+          return this.newNode();
+        }
+        return node;
+      }
+      case NodeTypeEnum.Number:
+      case NodeTypeEnum.Boolean:
+      case NodeTypeEnum.TypeList:
+      case NodeTypeEnum.Undefined: {
+        return node;
+      }
+      case NodeTypeEnum.Function: {
+        const funcNode = this.newNode(NodeTypeEnum.Function);
+        funcNode.isType = true;
+        funcNode.funcNode = {
+          params: [],
+          paramTypes: [],
+          paramReqs: [],
+          body: this.newNode(),
+          name: node.meta?.name,
+        };
+
+        this.flattenChildren(node.left?.node, [","]).forEach((param) => {
+          var isOptional = false;
+          if (
+            param.type === NodeTypeEnum.Operator &&
+            param.value === "unary!"
+          ) {
+            isOptional = true;
+            param = param.right;
+          }
+          if (param.type === NodeTypeEnum.Operator && param.value === "=") {
+            const paramName = param.left.value;
+            const paramType = this.resolveType(param.right);
+            funcNode.funcNode.paramTypes.push(paramType);
+            funcNode.funcNode.params.push(paramName);
+            funcNode.funcNode.paramReqs.push(isOptional);
+          } else if (
+            param.type === NodeTypeEnum.Operator &&
+            param.value === "unary..."
+          ) {
+            const paramType = this.newNode(NodeTypeEnum.CatchAllParam);
+            paramType.value = this.resolveType(param.right);
+            funcNode.funcNode.paramTypes.push(paramType);
+            funcNode.funcNode.params.push(paramType);
+          } else {
+            const paramName = param.value;
+            const paramType = this.resolveType(param);
+            funcNode.funcNode.paramTypes.push(paramType);
+            funcNode.funcNode.params.push(paramName);
+            funcNode.funcNode.paramReqs.push(isOptional);
+            if (paramType.type === NodeTypeEnum.Generic) {
+              funcNode.isGeneric = true;
+            }
+          }
+        });
+
+        funcNode.funcNode.body = this.resolveType(
+          node.right ?? this.newNode(NodeTypeEnum.Any)
+        );
+
+        return funcNode;
+      }
+      case NodeTypeEnum.Operator: {
+        const left = this.resolveType(node.left);
+        const right = this.resolveType(node.right);
+
+        if (node.value === "|") {
+          var types = this.flattenChildren(node, ["|"]) as Node[];
+          const typeOptionsList = this.newNode(NodeTypeEnum.TypeList);
+          typeOptionsList.nodes = this.removeDuplicateTypes(
+            types.map((e) => this.resolveType(e))
+          );
+          return typeOptionsList;
+        }
+
+        return this.newNode(NodeTypeEnum.Any);
+      }
+      case NodeTypeEnum.List: {
+        const typeList = this.newNode(NodeTypeEnum.List);
+        if (node.node) {
+          const elem = this.resolveType(node.node);
+          typeList.nodes = [elem];
+          if (elem.isGeneric) {
+            typeList.isGeneric = true;
+          }
+          return typeList;
+        }
+        var types = this.removeDuplicateTypes(
+          node.nodes?.map((e) => {
+            const elem = this.resolveType(e);
+            if (elem.isGeneric) {
+              typeList.isGeneric = true;
+            }
+            return elem;
+          })
+        );
+        typeList.nodes = types;
+        typeList.meta = node.meta;
+        return typeList;
+      }
+      default: {
+        return this.newNode(NodeTypeEnum.Any);
+      }
+    }
+  }
+
+  private resolveValueType(node: Node) {
     if (!node) {
       return this.newNode(NodeTypeEnum.Any);
     }
     switch (node.type) {
       case NodeTypeEnum.Paren: {
-        return this.resolveType(node.node);
+        return this.resolveValueType(node.node);
       }
       case NodeTypeEnum.Block: {
         // in order to scope this, we'll create a new generator
@@ -219,9 +375,7 @@ export class Generator {
         if (this.typeMap.hasOwnProperty(node.value)) {
           return this.typeMap[node.value];
         }
-        const generic = this.newNode(NodeTypeEnum.Generic, node.value);
-        generic.isGeneric = true;
-        return generic;
+        return this.newNode(NodeTypeEnum.Any);
       }
       case NodeTypeEnum.String: {
         if (node.value === "Number") {
@@ -281,7 +435,7 @@ export class Generator {
           }
           if (param.type === NodeTypeEnum.Operator && param.value === "=") {
             const paramName = param.left.value;
-            const paramType = this.resolveType(param.right);
+            const paramType = this.resolveValueType(param.right);
             if (!node.isType) {
               this.tempTypeMap[paramName] = paramType;
               paramNames.push(paramName);
@@ -295,7 +449,7 @@ export class Generator {
           ) {
             if (node.isType) {
               const paramType = this.newNode(NodeTypeEnum.CatchAllParam);
-              paramType.value = this.resolveType(param.right);
+              paramType.value = this.resolveValueType(param.right);
               funcNode.funcNode.paramTypes.push(paramType);
               funcNode.funcNode.params.push(paramType);
             } else {
@@ -310,7 +464,7 @@ export class Generator {
           } else {
             const paramName = param.value;
             const paramType = node.isType
-              ? this.resolveType(param)
+              ? this.resolveValueType(param)
               : this.newNode(NodeTypeEnum.Any);
             if (!node.isType) {
               this.tempTypeMap[paramName] = paramType;
@@ -325,7 +479,9 @@ export class Generator {
           }
         });
 
-        funcNode.funcNode.body = this.resolveType(node.right ?? this.newNode());
+        funcNode.funcNode.body = this.resolveValueType(
+          node.right ?? this.newNode()
+        );
 
         paramNames.forEach((name) => {
           delete this.tempTypeMap[name.value];
@@ -335,7 +491,7 @@ export class Generator {
       }
       case NodeTypeEnum.FunctionCall: {
         if (node.left.type === NodeTypeEnum.ID) {
-          const resolved = this.resolveType(node.left);
+          const resolved = this.resolveValueType(node.left);
           var fn = resolved;
 
           if (fn.type === NodeTypeEnum.Any) {
@@ -343,7 +499,7 @@ export class Generator {
           }
 
           const args: Node[] = this.flattenChildren(node.right.node, [","]).map(
-            (e) => this.resolveType(e)
+            (e) => this.resolveValueType(e)
           );
 
           if (fn.type === NodeTypeEnum.TypeList) {
@@ -379,8 +535,8 @@ export class Generator {
         return this.newNode(NodeTypeEnum.Any);
       }
       case NodeTypeEnum.Operator: {
-        const left = this.resolveType(node.left);
-        const right = this.resolveType(node.right);
+        const left = this.resolveValueType(node.left);
+        const right = this.resolveValueType(node.right);
 
         if (left.type === NodeTypeEnum.Any || right.type === NodeTypeEnum.Any) {
           return this.newNode(NodeTypeEnum.Any);
@@ -394,7 +550,7 @@ export class Generator {
           var types = this.flattenChildren(node, ["||"]) as Node[];
           const typeOptionsList = this.newNode(NodeTypeEnum.TypeList);
           typeOptionsList.nodes = this.removeDuplicateTypes(
-            types.map((e) => this.resolveType(e))
+            types.map((e) => this.resolveValueType(e))
           );
           return typeOptionsList;
         }
@@ -590,8 +746,8 @@ export class Generator {
             return;
           }
           const typeList = this.newNode(NodeTypeEnum.TypeList);
-          const leftStatement = this.resolveType(node.right.left);
-          const rightStatement = this.resolveType(node.right.right);
+          const leftStatement = this.resolveValueType(node.right.left);
+          const rightStatement = this.resolveValueType(node.right.right);
           typeList.nodes = this.removeDuplicateTypes([
             leftStatement,
             rightStatement,
@@ -630,7 +786,7 @@ export class Generator {
 
         if (node.value === ",") {
           var arr = this.flattenChildren(node, [","]).map((e) =>
-            this.resolveType(e)
+            this.resolveValueType(e)
           );
           arr = this.removeDuplicateTypes(arr);
           if (arr.length === 1) {
@@ -678,25 +834,16 @@ export class Generator {
 
         return this.newNode(NodeTypeEnum.Undefined);
       }
-      case NodeTypeEnum.TypeList: {
-        return node;
-      }
       case NodeTypeEnum.List: {
         const typeList = this.newNode(NodeTypeEnum.List);
         if (node.node) {
-          const elem = this.resolveType(node.node);
+          const elem = this.resolveValueType(node.node);
           typeList.nodes = [elem];
-          if (elem.isGeneric) {
-            typeList.isGeneric = true;
-          }
           return typeList;
         }
         var types = this.removeDuplicateTypes(
           node.nodes?.map((e) => {
-            const elem = this.resolveType(e);
-            if (elem.isGeneric) {
-              typeList.isGeneric = true;
-            }
+            const elem = this.resolveValueType(e);
             return elem;
           })
         );
@@ -704,7 +851,7 @@ export class Generator {
         typeList.meta = node.meta;
         return typeList;
       }
-      // todo: Lists, Objects, Functions etc.
+      // todo: Objects etc.
       default: {
         return this.newNode(NodeTypeEnum.Any);
       }
@@ -1007,7 +1154,7 @@ export class Generator {
 
             // type
             const type = this.resolveType(node.left);
-            const valueType = this.resolveType(node.right);
+            const valueType = this.resolveValueType(node.right);
             if (index >= 0 && this.variables[index].type === "let") {
               this.typeMap[node.left.value] = valueType;
             } else {
@@ -1430,7 +1577,7 @@ export class Generator {
           if (this.typeMap.hasOwnProperty(node.declNode.id.value)) {
             // check if value matches type
             const type = this.resolveType(node.declNode.id);
-            const valueType = this.resolveType(node.declNode.value);
+            const valueType = this.resolveValueType(node.declNode.value);
             if (symbol && node.value === "let" && symbol.type === "let") {
               this.typeMap[node.declNode.id.value] = valueType;
             } else {
@@ -1444,7 +1591,7 @@ export class Generator {
               }
             }
           } else {
-            this.typeMap[node.declNode.id.value] = this.resolveType(
+            this.typeMap[node.declNode.id.value] = this.resolveValueType(
               node.declNode.value
             );
           }
@@ -1624,7 +1771,7 @@ export class Generator {
           return;
         }
 
-        const arrType = this.resolveType(forLoopSections[0]);
+        const arrType = this.resolveValueType(forLoopSections[0]);
 
         if (forLoopSections.length > 1) {
           const valueName = forLoopSections[1];
@@ -1825,7 +1972,7 @@ export class Generator {
                 resolvedFunction.funcNode?.paramTypes[index] ??
                 this.newNode(NodeTypeEnum.Any);
             }
-            const defaultValueType = this.resolveType(param.right);
+            const defaultValueType = this.resolveValueType(param.right);
             if (!this.checkTypes(paramType, defaultValueType)) {
               this.errorAndExit(
                 `TypeError: Expected parameter type ${this.typeRepr(
@@ -1937,7 +2084,7 @@ export class Generator {
         this.generateBytecode(node.right, false, captureIds);
         this.generatedNodes.push(this.newNode(NodeTypeEnum.Return));
         // add return type
-        const returnType = this.resolveType(node.right);
+        const returnType = this.resolveValueType(node.right);
         if (this.returnType) {
           this.returnType = this.joinTypes(this.returnType, returnType);
         } else {
@@ -1950,7 +2097,7 @@ export class Generator {
         this.generatedNodes.push(this.newNode(NodeTypeEnum.Yield));
         this.isCoroutine = true;
         // add return type
-        const returnType = this.resolveType(node.right);
+        const returnType = this.resolveValueType(node.right);
         if (this.returnType) {
           this.returnType = this.joinTypes(this.returnType, returnType);
         } else {
@@ -2028,7 +2175,7 @@ export class Generator {
       this.returnType = this.newNode(NodeTypeEnum.Error);
       return -1;
     }
-    const returnType = this.resolveType(this.nodes.at(-1));
+    const returnType = this.resolveValueType(this.nodes.at(-1));
     if (returnType.type === NodeTypeEnum.Error) {
       return -1;
     }

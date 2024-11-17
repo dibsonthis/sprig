@@ -93,7 +93,18 @@ export class TypeChecker {
   }
 
   private getListType(node: Node) {
+    if (node.node) {
+      return node.node;
+    }
     return node.nodes?.[0] ?? this.newNode(NodeTypeEnum.Any);
+  }
+
+  private getAbsoluteType(node: Node) {
+    var res = node;
+    while (res.type === NodeTypeEnum.List) {
+      res = this.getListType(res);
+    }
+    return res;
   }
 
   private joinTypes(left: Node, right: Node) {
@@ -251,6 +262,9 @@ export class TypeChecker {
       case NodeTypeEnum.TypeList:
       case NodeTypeEnum.Undefined: {
         return node;
+      }
+      case NodeTypeEnum.FunctionCall: {
+        return this.resolveValueType(node);
       }
       case NodeTypeEnum.Function: {
         const funcNode = this.newNode(NodeTypeEnum.Function);
@@ -529,13 +543,23 @@ export class TypeChecker {
           const resolved = this.resolveValueType(node.left);
           var fn = resolved;
 
-          if (fn.type === NodeTypeEnum.Any) {
-            return fn;
-          }
-
           const args: Node[] = this.flattenChildren(node.right.node, [","]).map(
             (e) => this.resolveValueType(e)
           );
+
+          // if (node.left.value === "append") {
+          //   if (args.length !== 2) {
+          //     this.errorAndExit(
+          //       "Builtin function 'append' expects 2 arguments: [List, Any]"
+          //     );
+          //     return this.newNode(NodeTypeEnum.Error);
+          //   }
+          //   const listType = this.getListType(args[0]);
+          // }
+
+          if (fn.type === NodeTypeEnum.Any) {
+            return fn;
+          }
 
           if (fn.type === NodeTypeEnum.TypeList) {
             fn = fn.nodes.find((e: Node) =>
@@ -583,8 +607,30 @@ export class TypeChecker {
               const: true,
             };
             params.forEach((param: Node, index) => {
-              typechecker.typeMap[param.value] = {
-                node: args[index],
+              const absoluteParam = this.getAbsoluteType(param);
+              var absoluteType = this.getAbsoluteType(args[index]);
+              if (param.type === NodeTypeEnum.ID) {
+                absoluteType = args[index];
+              }
+              // if it already exists, we check the types to make sure
+              // it's the same
+              if (typechecker.typeMap.hasOwnProperty(absoluteParam.value)) {
+                const existingType =
+                  typechecker.typeMap[absoluteParam.value].node;
+                if (!this.checkTypes(existingType, absoluteType)) {
+                  this.errorAndExit(
+                    `TypeError: Type ${absoluteParam.value} (${this.typeRepr(
+                      existingType
+                    )}) cannot be assigned a value of type ${this.typeRepr(
+                      absoluteType
+                    )}`
+                  );
+                  return this.newNode(NodeTypeEnum.Error);
+                }
+              }
+
+              typechecker.typeMap[absoluteParam.value] = {
+                node: absoluteType,
                 const: true,
               };
             });
@@ -621,7 +667,7 @@ export class TypeChecker {
                     type
                   )} but received type ${this.typeRepr(valueType)}`
                 );
-                return;
+                return this.newNode(NodeTypeEnum.Error);
               }
             }
             return valueType;
@@ -964,6 +1010,36 @@ export class TypeChecker {
         // todo: objects
         return this.newNode(NodeTypeEnum.Any);
       }
+      case NodeTypeEnum.ForStatement: {
+        const sections: Node[] = this.flattenChildren(node.left.node, [","]);
+        if (sections.length === 0) {
+          this.errorAndExit("For loop cannot be empty");
+          return this.newNode(NodeTypeEnum.Error);
+        }
+        var _valueName;
+        var _indexName;
+        const arr = this.resolveValueType(sections[0]);
+        if (sections.length > 1) {
+          const valueName = sections[1].value;
+          const valueType = this.getListType(arr);
+          this.tempTypeMap[valueName] = { node: valueType, const: true };
+          _valueName = valueName;
+        }
+        if (sections.length > 2) {
+          const indexName = sections[1].index;
+          const indexType = this.newNode(NodeTypeEnum.Number);
+          this.tempTypeMap[indexName] = { node: indexType, const: true };
+          _indexName = indexName;
+        }
+        for (const expr of node.right.nodes) {
+          this.resolveValueType(expr);
+        }
+
+        _valueName && delete this.tempTypeMap[_valueName];
+        _indexName && delete this.tempTypeMap[_indexName];
+
+        return this.newNode();
+      }
       case NodeTypeEnum.Return: {
         const returnType = this.resolveValueType(node.right);
         if (this.returnType) {
@@ -1046,7 +1122,7 @@ export class TypeChecker {
     ) {
       const check = this.checkTypes(
         type.nodes?.[0] ?? this.newNode(NodeTypeEnum.Any),
-        valueType.nodes?.[0] ?? this.newNode()
+        valueType.nodes?.[0] ?? this.newNode(NodeTypeEnum.Any)
       );
       return check;
     }

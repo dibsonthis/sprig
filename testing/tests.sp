@@ -722,8 +722,45 @@
 // toNumber :: (Any) => Number
 // const toNumber = (value) => _toNumber(value)
 
-const foreach = (arr, fn) => fn(arr[0])
+// append :: ([T], T) => [T]
 
-var g = foreach((1..10) + ["hi"], (e) => e)
-g = foreach([1, 2, 3, "hi"], (e) => e)
+// const arr = [1, 2, 3]
+
+// append(arr, "hi")
+
+// fn :: ([T], T) => T
+// const fn = (a, b) => a[0]
+
+// var g = fn(1..10, "5")
+// g = true
+
+// const foreach = (arr, fn) => {
+//     res :: [fn(arr[0])]
+//     const res = []
+
+//     for (arr, v) {
+//         fn(v)
+//     }
+//     return fn(arr[1])
+// } 
+
+// var g = foreach([1, 2, 3], (e) => e + "2")
+// g = true
+
+append :: ([T], T) => [T]
+
+const map = (arr, fn) => {
+
+    res :: [fn(arr[Number], Number)]
+
+    const res = []
+
+    for (arr, v, i) {
+        append(res, fn(v, i))
+    }
+
+    return res
+}
+
+var g = map(1..100, (e, i) => [e + i])
 g = true

@@ -111,6 +111,9 @@ export class TypeChecker {
       newList.nodes = [...newList.nodes, right];
     }
     newList.nodes = this.removeDuplicateTypes(newList.nodes);
+    if (newList.nodes.length === 1) {
+      return newList.nodes[0];
+    }
     return newList;
   }
 
@@ -152,6 +155,10 @@ export class TypeChecker {
   private matchArgsWithFunctionType(args: Node[], fn: Node) {
     if (fn.type !== NodeTypeEnum.Function) {
       return false;
+    }
+
+    if (!fn.funcNode) {
+      return true;
     }
 
     const hasCatchAll =
@@ -383,16 +390,16 @@ export class TypeChecker {
         return valueType;
       }
       case NodeTypeEnum.Block: {
-        // in order to scope this, we'll create a new generator
-        const generator = new TypeChecker(node.nodes, this.filePath);
-        generator.typeMap = { ...this.typeMap };
-        generator.tempTypeMap = { ...this.tempTypeMap };
-        const res = generator.run();
+        // in order to scope this, we'll create a new typechecker
+        const typechecker = new TypeChecker(node.nodes, this.filePath);
+        typechecker.typeMap = { ...this.typeMap };
+        typechecker.tempTypeMap = { ...this.tempTypeMap };
+        const res = typechecker.run();
         if (res === -1) {
           this.hasError = true;
           return this.newNode(NodeTypeEnum.Error);
         }
-        return generator.returnType;
+        return typechecker.returnType;
       }
       case NodeTypeEnum.ID: {
         if (this.tempTypeMap.hasOwnProperty(node.value)) {
@@ -481,7 +488,10 @@ export class TypeChecker {
           } else {
             const paramName = param.value;
             var paramType = this.resolveValueType(param);
-            if (paramType.type === NodeTypeEnum.Generic) {
+            if (
+              paramType.type === NodeTypeEnum.Generic ||
+              paramType.type === NodeTypeEnum.Any
+            ) {
               // we look for the generic typename and change it
               const fnType = this.typeMap[node.meta?.name]?.node;
               const resolvedParam =
@@ -558,7 +568,18 @@ export class TypeChecker {
             const params = this.flattenChildren(fn.value.left.node, [","]);
             const body = fn.value.right;
             const generator = new TypeChecker([body], this.filePath);
-            generator.typeMap = this.typeMap;
+            generator.typeMap = {
+              ...this.typeMap,
+            };
+            // since it's a generic, it will recurse forever if called within itself
+            // so we send in a non-generic Function
+            const nonGeneric = this.newNode(NodeTypeEnum.Function);
+            nonGeneric.funcNode = fn.funcNode;
+            nonGeneric.isGeneric = false;
+            generator.typeMap[node.left.value] = {
+              node: nonGeneric,
+              const: true,
+            };
             params.forEach((param: Node, index) => {
               generator.typeMap[param.value] = {
                 node: args[index],
@@ -572,7 +593,7 @@ export class TypeChecker {
             return generator.returnType;
           }
 
-          return fn.funcNode.body;
+          return fn.funcNode?.body ?? this.newNode(NodeTypeEnum.Any);
         }
         return this.newNode(NodeTypeEnum.Any);
       }
@@ -601,6 +622,7 @@ export class TypeChecker {
                 return;
               }
             }
+            return valueType;
           }
         }
 
@@ -909,6 +931,16 @@ export class TypeChecker {
         typeList.meta = node.meta;
         return typeList;
       }
+      case NodeTypeEnum.IfStatement: {
+        const statement = this.resolveValueType(node.left);
+        if (statement.type === NodeTypeEnum.Error) {
+          return this.newNode(NodeTypeEnum.Error);
+        }
+        for (const expr of node.right.nodes) {
+          this.resolveValueType(expr);
+        }
+        return this.newNode();
+      }
       case NodeTypeEnum.Return: {
         const returnType = this.resolveValueType(node.right);
         if (this.returnType) {
@@ -916,6 +948,7 @@ export class TypeChecker {
         } else {
           this.returnType = returnType;
         }
+        return returnType;
       }
       // todo: Objects etc.
       default: {
@@ -1123,33 +1156,44 @@ export class TypeChecker {
         }
       }
       this.typeMap[id] = { node: type, const: true };
+      return this.newNode();
     } else {
-      this.resolveValueType(node);
+      return this.resolveValueType(node);
     }
   }
 
   public run() {
     while (this.node) {
-      if (this.hasError) {
-        this.returnType = this.newNode(NodeTypeEnum.Error);
+      // if (this.hasError) {
+      //   this.returnType = this.newNode(NodeTypeEnum.Error);
+      //   return -1;
+      // }
+      const res = this.typecheck(this.node);
+      if (!res || res.type === NodeTypeEnum.Error) {
         return -1;
       }
-      this.typecheck(this.node);
+      if (this.index === this.nodes.length - 1) {
+        if (this.returnType) {
+          this.returnType = this.joinTypes(this.returnType, res);
+        } else {
+          this.returnType = res;
+        }
+      }
       this.advance();
     }
     if (this.hasError) {
       this.returnType = this.newNode(NodeTypeEnum.Error);
       return -1;
     }
-    const returnType = this.resolveValueType(this.nodes.at(-1));
-    if (returnType.type === NodeTypeEnum.Error) {
-      return -1;
-    }
-    if (this.returnType) {
-      this.returnType = this.joinTypes(this.returnType, returnType);
-    } else {
-      this.returnType = returnType;
-    }
+    // const returnType = this.resolveValueType(this.nodes.at(-1));
+    // if (returnType.type === NodeTypeEnum.Error) {
+    //   return -1;
+    // }
+    // if (this.returnType) {
+    //   this.returnType = this.joinTypes(this.returnType, returnType);
+    // } else {
+    //   this.returnType = returnType;
+    // }
     return this.typeMap;
   }
 }

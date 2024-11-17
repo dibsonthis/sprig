@@ -680,16 +680,39 @@
 
 // blah :: (T, K) => T
 
-length :: ([Any]) => Number
+// length :: ([Any]) => Number
 
-const len = (arr) => length(arr)
+// const len = (arr) => length(arr)
 
-const len2 = (arr) => len(arr)
+// const len2 = (arr) => len(arr)
 
-const arr = 1..10
+// const arr = 1..10
 
-var g = len2(arr)
+// var g = len2(arr)
 
 // g = true
 
-print(g)
+
+// print(100)
+
+// const g = true
+
+// const f = (x) => x
+
+// var x = f(1)
+
+// x = "100"
+
+// print(100)
+
+// fib :: (Number) => Number
+const fib = (n) => {
+    if (n <= 1) {
+        return n
+    }
+    return fib(n - 1) + fib(n - 2)
+}
+
+var f = fib(10)
+print(f)
+f = true

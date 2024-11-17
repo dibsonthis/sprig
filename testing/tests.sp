@@ -699,20 +699,31 @@
 
 // const f = (x) => x
 
-// var x = f(1)
+// var x = f(1, 2)
 
 // x = "100"
 
 // print(100)
 
 // fib :: (Number) => Number
-const fib = (n) => {
-    if (n <= 1) {
-        return n
-    }
-    return fib(n - 1) + fib(n - 2)
-}
+// const fib = (n) => {
+//     if (n <= 1) {
+//         return n
+//     }
+//     return fib(n - 1) + fib(n - 2)
+// }
 
-var f = fib(10)
-print(f)
-f = true
+// var f = fib(10)
+// print(f)
+// f = true
+
+// const _toNumber = exec(`(value) => parseFloat(value)`)
+
+// toNumber :: (Any) => Number
+// const toNumber = (value) => _toNumber(value)
+
+const foreach = (arr, fn) => fn(arr[0])
+
+var g = foreach((1..10) + ["hi"], (e) => e)
+g = foreach([1, 2, 3, "hi"], (e) => e)
+g = true

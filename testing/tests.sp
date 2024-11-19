@@ -762,5 +762,9 @@ const map = (arr, fn) => {
     return res
 }
 
-var g = map(1..100, (e, i) => [e + i])
-g = true
+var mappedNums = map(1..10, (e, i) => e * i)
+var mappedStrs = map(1..10, (e, i) => `{{e}}: {{i}}`)
+
+mappedStrs = mappedNums
+
+print({mappedNums, mappedStrs})

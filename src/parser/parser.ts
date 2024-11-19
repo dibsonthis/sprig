@@ -256,10 +256,6 @@ export class Parser {
         this.node.left = this.nodes[this.index - 1];
         const nextNode = this.nextNode();
 
-        if (this.node.value === "::") {
-          nextNode.isType = true;
-        }
-
         if (
           op === "=" &&
           nextNode.type === NodeTypeEnum.Function &&

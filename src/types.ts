@@ -280,6 +280,7 @@ export type FuncNode = {
   paramTypes?: Node[];
   paramReqs?: boolean[];
   paramNames?: string[];
+  calculatedReturnType?: Node;
   closures?: SymbolTable;
   defaults?: {};
   originFilePath?: string;
@@ -348,6 +349,7 @@ export type Node = {
   evaluated?: boolean;
   isType?: boolean;
   isGeneric?: boolean;
+  concreteType?: Node;
 };
 
 export type NodePayload = {

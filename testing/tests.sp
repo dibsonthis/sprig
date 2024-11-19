@@ -678,32 +678,6 @@
 // const f = (n = 10) => n
 // f(1, 2)
 
-// blah :: (T, K) => T
-
-// length :: ([Any]) => Number
-
-// const len = (arr) => length(arr)
-
-// const len2 = (arr) => len(arr)
-
-// const arr = 1..10
-
-// var g = len2(arr)
-
-// g = true
-
-
-// print(100)
-
-// const g = true
-
-// const f = (x) => x
-
-// var x = f(1, 2)
-
-// x = "100"
-
-// print(100)
 
 // fib :: (Number) => Number
 // const fib = (n) => {
@@ -717,54 +691,45 @@
 // print(f)
 // f = true
 
-// const _toNumber = exec(`(value) => parseFloat(value)`)
-
-// toNumber :: (Any) => Number
-// const toNumber = (value) => _toNumber(value)
 
 // append :: ([T], T) => [T]
 
-// const arr = [1, 2, 3]
+// const map = (arr, fn) => {
 
-// append(arr, "hi")
+//     res :: [fn(arr[Number], Number)]
 
-// fn :: ([T], T) => T
-// const fn = (a, b) => a[0]
-
-// var g = fn(1..10, "5")
-// g = true
-
-// const foreach = (arr, fn) => {
-//     res :: [fn(arr[0])]
 //     const res = []
 
-//     for (arr, v) {
-//         fn(v)
+//     for (arr, v, i) {
+//         append(res, fn(v, i))
 //     }
-//     return fn(arr[1])
-// } 
 
-// var g = foreach([1, 2, 3], (e) => e + "2")
+//     return res
+// }
+
+// var mappedNums = map(1..10, (e, i) => e * i)
+// var mappedStrs = map(1..10, (e, i) => `{{e}}: {{i}}`)
+
+// mappedStrs = mappedNums
+
+// print({mappedNums, mappedStrs})
+
+// fn :: (T) => T
+// const fn = (x) => "10"
+
+// var g = fn("1")
 // g = true
 
-append :: ([T], T) => [T]
+// Blah :: (T) => Not(T)
+// x :: Blah(Number)
+// const x = 10
 
-const map = (arr, fn) => {
+// NotT :: (T) => Not(T)
+// NotANumber :: NotT(Number)
+// NotAString :: NotT(String)
+Either :: (T, K) => T | K
+EitherStringOrT :: (T) => Either(String, T)
 
-    res :: [fn(arr[Number], Number)]
+z :: EitherStringOrT(Boolean)
 
-    const res = []
-
-    for (arr, v, i) {
-        append(res, fn(v, i))
-    }
-
-    return res
-}
-
-var mappedNums = map(1..10, (e, i) => e * i)
-var mappedStrs = map(1..10, (e, i) => `{{e}}: {{i}}`)
-
-mappedStrs = mappedNums
-
-print({mappedNums, mappedStrs})
+const z = 1

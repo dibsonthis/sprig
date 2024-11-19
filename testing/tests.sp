@@ -727,9 +727,46 @@
 // NotT :: (T) => Not(T)
 // NotANumber :: NotT(Number)
 // NotAString :: NotT(String)
-Either :: (T, K) => T | K
-EitherStringOrT :: (T) => Either(String, T)
 
-z :: EitherStringOrT(Boolean)
+// Either :: (T, K) => T | K
+// EitherStringOrT :: (T) => Either(String, T)
+// z :: EitherStringOrT(Boolean | Number)
 
-const z = 1
+// NotNumber :: Exclude(Number | Boolean | String, Number | Boolean)
+// x :: NotNumber
+// const x = 1
+
+// NotAType :: (T, K) => Exclude(T, K)
+// NotANumber :: (T) => NotAType(T, Number)
+
+// const g = 100
+// const y = true
+
+// x :: NotANumber(g)
+// const x = g
+
+// Fn :: (T, T) => ((T, T) => T)
+// NumFn :: Fn(Number, Number)
+// StrFn :: Fn(String, String)
+
+// f :: StrFn
+// const f = (a, b) => a + b + ""
+
+// NonNullable :: (T) => Exclude(T, Undefined)
+// x :: NonNullable(Number)
+// var x;
+
+map :: ([T], ((T, Number) => K)) => [K]
+append :: ([T], T) => [T]
+
+const map = (arr, fn) => {
+    res :: [Call(fn(arr[Number], Number))]
+    const res = []
+    for (arr, v, i) {
+        append(res, fn(v, i))
+    }
+    return res
+}
+
+var res = map(1..10, (e, i) => "hi")
+res = map(1..10, (e, i) => e + i)

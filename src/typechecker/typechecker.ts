@@ -81,6 +81,24 @@ export class TypeChecker {
     return repr;
   }
 
+  private excludeTypes(nodes: Node[], toExclude: Node) {
+    const typeList = this.newNode(NodeTypeEnum.TypeList);
+    var isAny = false;
+    typeList.nodes = this.removeDuplicateTypes(
+      nodes.reduce((acc, current) => {
+        if (current.type === NodeTypeEnum.Any) {
+          isAny = true;
+        }
+        const generic = current.type === NodeTypeEnum.Generic;
+        const exists = !generic && this.checkTypes(toExclude, current);
+        if (!exists) acc.push(current);
+        return acc;
+      }, [] as Node[])
+    );
+
+    return typeList;
+  }
+
   private removeDuplicateTypes(nodes: Node[]) {
     if (!nodes) {
       return [];
@@ -195,7 +213,7 @@ export class TypeChecker {
     }
 
     const hasCatchAll =
-      fn.funcNode.paramTypes.at(-1).type === NodeTypeEnum.CatchAllParam;
+      fn.funcNode.paramTypes.at(-1)?.type === NodeTypeEnum.CatchAllParam;
 
     var paramsLength = hasCatchAll
       ? fn.funcNode.paramTypes.length - 1
@@ -271,7 +289,9 @@ export class TypeChecker {
         this.errorAndExit(
           `No function type exists for arguments: ${node.left.value}(${args
             .map((arg) => this.typeRepr(arg))
-            .join(", ")})\nFound following type: ${this.typeRepr(fn)}`,
+            .join(", ")})\nFound following type: ${
+            node.left.value
+          }: ${this.typeRepr(fn)}`,
           node
         );
         return this.newNode(NodeTypeEnum.Error);
@@ -414,12 +434,29 @@ export class TypeChecker {
           if (node.left.value === "Call") {
             return this.resolveValueType(node.right);
           }
-          if (node.left.value === "Not") {
-            const typeFnCall = this.newNode(NodeTypeEnum.FunctionCall);
-            typeFnCall.left = node.left;
-            typeFnCall.right = this.resolveType(node.right);
-            typeFnCall.isType = true;
-            return typeFnCall;
+          if (node.left.value === "Exclude") {
+            const args = this.flattenChildren(node.right.node, [","]).map((e) =>
+              this.resolveType(e)
+            );
+            if (args.length !== 2) {
+              return this.newNode(NodeTypeEnum.Undefined);
+            }
+
+            var left = args[0];
+            const right = args[1];
+
+            if (args[0].type !== NodeTypeEnum.TypeList) {
+              left = this.newNode(NodeTypeEnum.TypeList);
+              left.nodes = [args[0]];
+            }
+
+            const res = this.excludeTypes(left.nodes, right);
+
+            if (res.nodes.length === 0) {
+              return this.newNode(NodeTypeEnum.Undefined);
+            }
+
+            return res;
           }
           return (
             this.tcFunctionCall(node, false) ?? this.newNode(NodeTypeEnum.Any)
@@ -478,7 +515,7 @@ export class TypeChecker {
         );
 
         funcNode.funcNode.calculatedReturnType = funcNode.funcNode.body;
-        funcNode.value.right = funcNode.funcNode.body;
+        // funcNode.value.right = funcNode.funcNode.body;
 
         return funcNode;
       }
@@ -538,7 +575,7 @@ export class TypeChecker {
         return this.newNode(NodeTypeEnum.String);
       }
       case NodeTypeEnum.Decl: {
-        const valueType = this.resolveValueType(node.declNode.value);
+        var valueType = this.resolveValueType(node.declNode.value);
 
         if (this.typeMap.hasOwnProperty(node.declNode.id.value)) {
           const type = this.resolveType(node.declNode.id);
@@ -593,7 +630,7 @@ export class TypeChecker {
         } else if (this.closureTypeMap.hasOwnProperty(node.value)) {
           res = this.closureTypeMap[node.value].node;
         }
-        return res.concreteType ?? res;
+        return res;
       }
       case NodeTypeEnum.String: {
         if (node.value === "Number") {
@@ -1386,6 +1423,8 @@ export class TypeChecker {
   private errorAndExit(message: string, node?: Node) {
     this.errorAndContinue(message, node);
     this.hasError = true;
+    // we're in dev, we can process.exit()
+    process.exit(1);
   }
 
   constructor(nodes: Node[], filePath: string = ".") {

@@ -749,15 +749,17 @@
 // NumFn :: Fn(Number, Number)
 // StrFn :: Fn(String, String)
 
-// f :: StrFn
-// const f = (a, b) => a + b + ""
+// f :: StrFn | NumFn
+// const f = (a, b) => a + b
+// var res = f(1, 2)
+// res = true
 
 // NonNullable :: (T) => Exclude(T, Undefined)
 // x :: NonNullable(Number)
 // var x;
 
-map :: ([T], ((T, Number) => K)) => [K]
 append :: ([T], T) => [T]
+map :: ([T], ((T, Number) => K)) => [K]
 
 const map = (arr, fn) => {
     res :: [Call(fn(arr[Number], Number))]
@@ -768,5 +770,5 @@ const map = (arr, fn) => {
     return res
 }
 
-var res = map(1..10, (e, i) => "hi")
+var res = map(1..10, (e, i) => "1")
 res = map(1..10, (e, i) => e + i)

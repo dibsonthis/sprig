@@ -255,175 +255,281 @@ export class TypeChecker {
       ? this.resolveValueType.bind(this)
       : this.resolveType.bind(this);
 
-    if (node.left.type === NodeTypeEnum.ID) {
-      const resolved = resolve(node.left);
-      var fn: Node = resolved;
+    var func: Node = resolve(node.left);
 
-      const args: Node[] = this.flattenChildren(node.right.node, [","]).map(
-        (e) => resolve(e)
-      );
+    if (func.type === NodeTypeEnum.Any) {
+      return func;
+    }
 
-      if (fn.type === NodeTypeEnum.Any) {
-        return fn;
-      }
+    const rawArgs: Node[] = this.flattenChildren(node.right.node, [","]);
+    const sortedArgs: Node[] = Array.from(
+      { length: func.funcNode.paramTypes.length },
+      (_, i) => this.newNode()
+    );
 
-      if (fn.type === NodeTypeEnum.TypeList) {
-        fn = fn.nodes.find((e: Node) =>
-          this.matchArgsWithFunctionType(args, e)
+    rawArgs.forEach((arg, index) => {
+      if (arg.type === NodeTypeEnum.Operator && arg.value === ":") {
+        const name = arg.left;
+        const value = resolve(arg.right);
+        const paramIndex = func.funcNode.paramNames?.findIndex(
+          (paramName) => paramName === name.value
         );
+        paramIndex !== undefined && (sortedArgs[paramIndex] = value);
+      } else {
+        const value = resolve(arg);
+        sortedArgs[index] = value;
       }
+    });
 
-      if (!fn) {
+    if (func.type === NodeTypeEnum.TypeList) {
+      func = func.nodes.find((e: Node) =>
+        this.matchArgsWithFunctionType(sortedArgs, e)
+      );
+      if (!func) {
         this.errorAndExit(
-          `No function type exists for arguments: ${node.left.value}(${args
+          `No function type exists for arguments: (${sortedArgs
             .map((arg) => this.typeRepr(arg))
-            .join(", ")})\nFound following types: \n${resolved.nodes
-            ?.map((fn) => `${node.left.value}: ${this.typeRepr(fn)}`)
+            .join(", ")})\nFound following types: \n${func.nodes
+            ?.map((fn) => `${this.typeRepr(fn)}`)
             .join("\n")}`,
           node
         );
-        return this.newNode(NodeTypeEnum.Error);
       }
+    }
 
-      if (!this.matchArgsWithFunctionType(args, fn)) {
-        this.errorAndExit(
-          `No function type exists for arguments: ${node.left.value}(${args
-            .map((arg) => this.typeRepr(arg))
-            .join(", ")})\nFound following type: ${
-            node.left.value
-          }: ${this.typeRepr(fn)}`,
-          node
-        );
-        return this.newNode(NodeTypeEnum.Error);
+    if (func.type !== NodeTypeEnum.Function) {
+      this.errorAndExit(`TypeError: ${this.typeRepr(func)} is not callable`);
+    }
+
+    if (!this.matchArgsWithFunctionType(sortedArgs, func)) {
+      this.errorAndExit(
+        `No function type exists for arguments: (${sortedArgs
+          .map((arg) => this.typeRepr(arg))
+          .join(", ")})\nFound following type: ${this.typeRepr(func)}`,
+        node
+      );
+    }
+
+    if (!func.isGeneric) {
+      return func.funcNode.body;
+    }
+
+    const tc = new TypeChecker([func.funcNode.body], this.filePath);
+
+    func.funcNode.paramTypes.forEach((paramType, index) => {
+      const paramName = func.funcNode.paramNames[index];
+      var value = sortedArgs[index];
+      if (paramName) {
+        tc.typeMap[paramName] = { type: value };
       }
-
-      if (fn.isGeneric && fn.value) {
-        // we need to evaluate this function with the correct types
-        const params = this.flattenChildren(fn.value.left.node, [","]);
-        const body = fn.value.right;
-        const typechecker = new TypeChecker([body], this.filePath);
-        typechecker.closureTypeMap = {
-          ...this.typeMap,
-        };
-        // since it's a generic, it will recurse forever if called within itself
-        // so we send in a non-generic Function
-        const nonGeneric = this.newNode(NodeTypeEnum.Function);
-        nonGeneric.funcNode = fn.funcNode;
-        nonGeneric.isGeneric = false;
-        typechecker.typeMap[node.left.value] = {
-          type: nonGeneric,
-        };
-        params.forEach((param: Node, index) => {
-          var { typeRes: absoluteParam, valueRes: absoluteType } =
-            this.getAbsoluteValueOfType(param, args[index]);
-          // const absoluteParam = this.getAbsoluteType(param);
-          // var absoluteType = this.getAbsoluteType(args[index]);
-          if (param.type === NodeTypeEnum.ID) {
-            absoluteType = args[index];
-          }
-          // if it already exists, we check the types to make sure
-          // it's the same
-          if (typechecker.typeMap.hasOwnProperty(absoluteParam.value)) {
-            const existingType = typechecker.typeMap[absoluteParam.value].type;
-            if (!this.checkTypes(existingType, absoluteType)) {
-              this.errorAndExit(
-                `TypeError: Type ${absoluteParam.value} (${this.typeRepr(
-                  existingType
-                )}) cannot be assigned a value of type ${this.typeRepr(
-                  absoluteType
-                )}`
-              );
-              return this.newNode(NodeTypeEnum.Error);
-            }
-          }
-
-          typechecker.typeMap[absoluteParam.value] = {
-            type: absoluteType,
-          };
-
-          // Check the typeDef, it it exists, we also add it to the typeMap
-          // TODO: separate types from values in typeMap so we can name
-          // variables the same
-
-          if (fn.funcNode.typeDef) {
-            const typedParam = fn.funcNode.typeDef.funcNode.paramTypes[index];
-            if (
-              typedParam.type === NodeTypeEnum.Generic ||
-              typedParam.isGeneric
-            ) {
-              const absolutes = this.getAbsoluteValueOfType(
-                typedParam,
-                args[index]
-              );
-
-              // if it already exists, we check the types to make sure
-              // it's the same
-              if (typechecker.typeMap.hasOwnProperty(absolutes.typeRes.value)) {
-                const existingType =
-                  typechecker.typeMap[absolutes.typeRes.value].type;
-                if (!this.checkTypes(existingType, absolutes.valueRes)) {
-                  this.errorAndExit(
-                    `TypeError: Type ${
-                      absolutes.typeRes.value
-                    } (${this.typeRepr(
-                      existingType
-                    )}) cannot be assigned a value of type ${this.typeRepr(
-                      absolutes.valueRes
-                    )}`
-                  );
-                  return this.newNode(NodeTypeEnum.Error);
-                }
-              }
-
-              typechecker.typeMap[absolutes.typeRes.value] = {
-                type: absolutes.valueRes,
-              };
-            }
-          }
-        });
-
-        typechecker.expectedReturnType = fn.funcNode.calculatedReturnType;
-
-        typechecker.inTypeLand = !asValueType;
-
-        if (typechecker.run() === -1) {
-          this.hasError = true;
-          return this.newNode(NodeTypeEnum.Error);
-        }
-
-        if (fn.funcNode.typeDef) {
-          // We resolve the typed result and check it matches what the
-          // implementation has returned
-          const typedRes = typechecker.resolveType(
-            fn.funcNode.typeDef.funcNode.body
-          );
-          if (!this.checkTypes(typedRes, typechecker.returnType)) {
+      if (paramType.isGeneric || paramType.type === NodeTypeEnum.Generic) {
+        const absolutes = this.getAbsoluteValueOfType(paramType, value);
+        // If a generic has been defined already, we typecheck it
+        if (tc.typeMap[absolutes.typeRes.value]) {
+          const existingGeneric = tc.typeMap[absolutes.typeRes.value];
+          const check = tc.checkTypes(existingGeneric.type, absolutes.valueRes);
+          if (!check) {
             this.errorAndExit(
-              `TypeError: Expected return type ${this.typeRepr(
-                typedRes
-              )} but received type ${this.typeRepr(typechecker.returnType)}`,
-              typechecker.returnType
+              `TypeError: Mismatch in type of parameter ${paramName} - Type ${this.typeRepr(
+                absolutes.valueRes
+              )} is not assignable to type ${
+                absolutes.typeRes.value
+              } (${this.typeRepr(existingGeneric.type)})`
             );
           }
-
-          // experimental
-          const typedBody = fn.funcNode.typeDef.funcNode.body;
-          if (typedBody.type === NodeTypeEnum.Generic || typedBody.isGeneric) {
-            const absolutes = this.getAbsoluteValueOfType(typedBody, typedRes);
-            this.typeMap[absolutes.typeRes.value] = {
-              type: absolutes.valueRes,
-            };
-          }
+        } else {
+          tc.typeMap[absolutes.typeRes.value] = { type: absolutes.valueRes };
         }
-
-        return typechecker.returnType.type === NodeTypeEnum.Generic ||
-          typechecker.returnType.type === NodeTypeEnum.Any
-          ? typechecker.expectedReturnType ?? typechecker.returnType
-          : typechecker.returnType;
       }
+    });
 
-      return fn.funcNode?.body ?? this.newNode(NodeTypeEnum.Any);
+    const expectedReturnType = func.funcNode.returnType;
+
+    tc.run();
+
+    if (expectedReturnType) {
+      const evaluatedExpectedReturnType = tc.resolveType(expectedReturnType);
+      const check = this.checkTypes(evaluatedExpectedReturnType, tc.returnType);
+      if (!check) {
+        this.errorAndExit(
+          `TypeError: Defined return type is ${this.typeRepr(
+            evaluatedExpectedReturnType
+          )} but function returns ${this.typeRepr(tc.returnType)}`
+        );
+      }
     }
+
+    return tc.returnType;
+
+    // if (node.left.type === NodeTypeEnum.ID) {
+    //   const resolved = resolve(node.left);
+    //   var fn: Node = resolved;
+
+    //   const args: Node[] = this.flattenChildren(node.right.node, [","]).map(
+    //     (e) => resolve(e)
+    //   );
+
+    //   if (fn.type === NodeTypeEnum.Any) {
+    //     return fn;
+    //   }
+
+    //   if (fn.type === NodeTypeEnum.TypeList) {
+    //     fn = fn.nodes.find((e: Node) =>
+    //       this.matchArgsWithFunctionType(args, e)
+    //     );
+    //   }
+
+    //   if (!fn) {
+    //     this.errorAndExit(
+    //       `No function type exists for arguments: ${node.left.value}(${args
+    //         .map((arg) => this.typeRepr(arg))
+    //         .join(", ")})\nFound following types: \n${resolved.nodes
+    //         ?.map((fn) => `${node.left.value}: ${this.typeRepr(fn)}`)
+    //         .join("\n")}`,
+    //       node
+    //     );
+    //     return this.newNode(NodeTypeEnum.Error);
+    //   }
+
+    //   if (!this.matchArgsWithFunctionType(args, fn)) {
+    //     this.errorAndExit(
+    //       `No function type exists for arguments: ${node.left.value}(${args
+    //         .map((arg) => this.typeRepr(arg))
+    //         .join(", ")})\nFound following type: ${
+    //         node.left.value
+    //       }: ${this.typeRepr(fn)}`,
+    //       node
+    //     );
+    //     return this.newNode(NodeTypeEnum.Error);
+    //   }
+
+    //   if (fn.isGeneric && fn.value) {
+    //     // we need to evaluate this function with the correct types
+    //     const params = this.flattenChildren(fn.value.left.node, [","]);
+    //     const body = fn.value.right;
+    //     const typechecker = new TypeChecker([body], this.filePath);
+    //     typechecker.closureTypeMap = {
+    //       ...this.typeMap,
+    //     };
+    //     // since it's a generic, it will recurse forever if called within itself
+    //     // so we send in a non-generic Function
+    //     const nonGeneric = this.newNode(NodeTypeEnum.Function);
+    //     nonGeneric.funcNode = fn.funcNode;
+    //     nonGeneric.isGeneric = false;
+    //     typechecker.typeMap[node.left.value] = {
+    //       type: nonGeneric,
+    //     };
+    //     params.forEach((param: Node, index) => {
+    //       var { typeRes: absoluteParam, valueRes: absoluteType } =
+    //         this.getAbsoluteValueOfType(param, args[index]);
+    //       // const absoluteParam = this.getAbsoluteType(param);
+    //       // var absoluteType = this.getAbsoluteType(args[index]);
+    //       if (param.type === NodeTypeEnum.ID) {
+    //         absoluteType = args[index];
+    //       }
+    //       // if it already exists, we check the types to make sure
+    //       // it's the same
+    //       if (typechecker.typeMap.hasOwnProperty(absoluteParam.value)) {
+    //         const existingType = typechecker.typeMap[absoluteParam.value].type;
+    //         if (!this.checkTypes(existingType, absoluteType)) {
+    //           this.errorAndExit(
+    //             `TypeError: Type ${absoluteParam.value} (${this.typeRepr(
+    //               existingType
+    //             )}) cannot be assigned a value of type ${this.typeRepr(
+    //               absoluteType
+    //             )}`
+    //           );
+    //           return this.newNode(NodeTypeEnum.Error);
+    //         }
+    //       }
+
+    //       typechecker.typeMap[absoluteParam.value] = {
+    //         type: absoluteType,
+    //       };
+
+    //       // Check the typeDef, it it exists, we also add it to the typeMap
+    //       // TODO: separate types from values in typeMap so we can name
+    //       // variables the same
+
+    //       if (fn.funcNode.typeDef) {
+    //         const typedParam = fn.funcNode.typeDef.funcNode.paramTypes[index];
+    //         if (
+    //           typedParam.type === NodeTypeEnum.Generic ||
+    //           typedParam.isGeneric
+    //         ) {
+    //           const absolutes = this.getAbsoluteValueOfType(
+    //             typedParam,
+    //             args[index]
+    //           );
+
+    //           // if it already exists, we check the types to make sure
+    //           // it's the same
+    //           if (typechecker.typeMap.hasOwnProperty(absolutes.typeRes.value)) {
+    //             const existingType =
+    //               typechecker.typeMap[absolutes.typeRes.value].type;
+    //             if (!this.checkTypes(existingType, absolutes.valueRes)) {
+    //               this.errorAndExit(
+    //                 `TypeError: Type ${
+    //                   absolutes.typeRes.value
+    //                 } (${this.typeRepr(
+    //                   existingType
+    //                 )}) cannot be assigned a value of type ${this.typeRepr(
+    //                   absolutes.valueRes
+    //                 )}`
+    //               );
+    //               return this.newNode(NodeTypeEnum.Error);
+    //             }
+    //           }
+
+    //           typechecker.typeMap[absolutes.typeRes.value] = {
+    //             type: absolutes.valueRes,
+    //           };
+    //         }
+    //       }
+    //     });
+
+    //     typechecker.expectedReturnType = fn.funcNode.calculatedReturnType;
+
+    //     typechecker.inTypeLand = !asValueType;
+
+    //     if (typechecker.run() === -1) {
+    //       this.hasError = true;
+    //       return this.newNode(NodeTypeEnum.Error);
+    //     }
+
+    //     if (fn.funcNode.typeDef) {
+    //       // We resolve the typed result and check it matches what the
+    //       // implementation has returned
+    //       const typedRes = typechecker.resolveType(
+    //         fn.funcNode.typeDef.funcNode.body
+    //       );
+    //       if (!this.checkTypes(typedRes, typechecker.returnType)) {
+    //         this.errorAndExit(
+    //           `TypeError: Expected return type ${this.typeRepr(
+    //             typedRes
+    //           )} but received type ${this.typeRepr(typechecker.returnType)}`,
+    //           typechecker.returnType
+    //         );
+    //       }
+
+    //       // experimental
+    //       const typedBody = fn.funcNode.typeDef.funcNode.body;
+    //       if (typedBody.type === NodeTypeEnum.Generic || typedBody.isGeneric) {
+    //         const absolutes = this.getAbsoluteValueOfType(typedBody, typedRes);
+    //         this.typeMap[absolutes.typeRes.value] = {
+    //           type: absolutes.valueRes,
+    //         };
+    //       }
+    //     }
+
+    //     return typechecker.returnType.type === NodeTypeEnum.Generic ||
+    //       typechecker.returnType.type === NodeTypeEnum.Any
+    //       ? typechecker.expectedReturnType ?? typechecker.returnType
+    //       : typechecker.returnType;
+    //   }
+
+    //   return fn.funcNode?.body ?? this.newNode(NodeTypeEnum.Any);
+    // }
   }
 
   private resolveType(node: Node): Node {
@@ -584,7 +690,7 @@ export class TypeChecker {
           node.right ?? this.newNode(NodeTypeEnum.Any)
         );
 
-        funcNode.funcNode.calculatedReturnType = funcNode.funcNode.body;
+        funcNode.funcNode.returnType = funcNode.funcNode.body;
         // funcNode.value.right = funcNode.funcNode.body;
 
         return funcNode;
@@ -770,137 +876,90 @@ export class TypeChecker {
 
         const tc = new TypeChecker([node.right], this.filePath);
 
-        this.flattenChildren(node.left?.node, [","]).forEach(
-          (param: Node, index) => {
-            var type;
-            var value;
-            var isOptional = false;
-            var isCatchAll = false;
+        this.flattenChildren(node.left?.node, [","]).forEach((param: Node) => {
+          var type;
+          var value;
+          var isOptional = false;
+          var isCatchAll = false;
 
-            if (param.type === NodeTypeEnum.Operator && param.value === "=") {
-              value = this.resolveValueType(param.right);
-              param = param.left;
-            }
-
-            if (this.isTypeNode(param)) {
-              type = this.resolveType(param.right);
-              param = param.left;
-            }
-
-            if (
-              param.type === NodeTypeEnum.Operator &&
-              param.value === "unary!"
-            ) {
-              isOptional = true;
-              param = param.right;
-            }
-
-            if (
-              param.type === NodeTypeEnum.Operator &&
-              param.value === "unary..."
-            ) {
-              isCatchAll = true;
-              param = param.right;
-            }
-
-            // At this point, param is an ID
-            // we'll typecheck it if it has a value
-            if (type && value) {
-              const check = this.checkTypes(type, value);
-              if (!check) {
-                this.errorAndExit(
-                  `TypeError: Parameter '${
-                    param.value
-                  }' is of type ${this.typeRepr(
-                    type
-                  )} but received value of type ${this.typeRepr(value)}`
-                );
-              }
-            }
-
-            if (!type) {
-              type = this.newNode(NodeTypeEnum.Any);
-            }
-            if (!value) {
-              if (isCatchAll) {
-                value = this.newNode(NodeTypeEnum.List);
-              } else {
-                value = this.newNode();
-              }
-            }
-
-            funcNode.funcNode.paramNames.push(param.value);
-            funcNode.funcNode.paramsOptional.push(isOptional);
-            funcNode.funcNode.paramsCatchAll.push(isCatchAll);
-            funcNode.funcNode.paramTypes.push(type);
-
-            if (param.value) {
-              tc.typeMap[param.value] = { type, concreteType: value };
-            }
-
-            // if (param.type === NodeTypeEnum.Operator && param.value === "=") {
-            //   const paramName = param.left.value;
-            //   const paramType = this.resolveValueType(param.right);
-            //   // this.tempTypeMap[paramName] = { node: paramType, const: true };
-            //   tc.typeMap[paramName] = { type: paramType };
-            //   paramNames.push(paramName);
-            //   funcNode.funcNode.paramTypes.push(paramType);
-            //   funcNode.funcNode.params.push(paramName);
-            //   funcNode.funcNode.paramsOptional.push(isOptional);
-            // } else if (
-            //   param.type === NodeTypeEnum.Operator &&
-            //   param.value === "unary..."
-            // ) {
-            //   const paramName = param.right.value;
-            //   const paramType = this.newNode(NodeTypeEnum.CatchAllParam);
-            //   paramType.value = this.newNode(NodeTypeEnum.Any);
-            //   funcNode.funcNode.paramTypes.push(paramType);
-            //   funcNode.funcNode.params.push(paramName);
-            //   // this.tempTypeMap[paramName] = { node: paramType, const: true };
-            //   tc.typeMap[paramName] = { type: paramType };
-            //   paramNames.push(paramName);
-            // } else {
-            //   const paramName = param.value;
-            //   var paramType = this.resolveValueType(param);
-            //   if (
-            //     paramType.type === NodeTypeEnum.Generic ||
-            //     paramType.type === NodeTypeEnum.Any
-            //   ) {
-            //     // we look for the generic typename and change it
-            //     const fnType = this.typeMap[node.meta?.name]?.type;
-            //     const resolvedParam =
-            //       fnType?.funcNode?.paramTypes?.[index] ?? paramType;
-            //     paramType = resolvedParam;
-            //   }
-            //   // this.tempTypeMap[paramName] = { node: paramType, const: true };
-            //   tc.typeMap[paramName] = { type: paramType };
-            //   paramNames.push(paramName);
-            //   funcNode.funcNode.paramTypes.push(paramType);
-            //   funcNode.funcNode.params.push(paramName);
-            //   funcNode.funcNode.paramsOptional.push(isOptional);
-            //   if (
-            //     paramType.type === NodeTypeEnum.Generic ||
-            //     paramType.isGeneric ||
-            //     paramType.type === NodeTypeEnum.Any
-            //   ) {
-            //     funcNode.isGeneric = true;
-            //   }
-            // }
+          if (param.type === NodeTypeEnum.Operator && param.value === "=") {
+            value = this.resolveValueType(param.right);
+            param = param.left;
           }
-        );
+
+          if (this.isTypeNode(param)) {
+            type = this.resolveType(param.right);
+            if (type.type === NodeTypeEnum.Generic) {
+              funcNode.isGeneric = true;
+            }
+            param = param.left;
+          }
+
+          if (
+            param.type === NodeTypeEnum.Operator &&
+            param.value === "unary!"
+          ) {
+            isOptional = true;
+            param = param.right;
+          }
+
+          if (
+            param.type === NodeTypeEnum.Operator &&
+            param.value === "unary..."
+          ) {
+            isCatchAll = true;
+            param = param.right;
+          }
+
+          // At this point, param is an ID
+          // we'll typecheck it if it has a value
+          if (type && value) {
+            const check = this.checkTypes(type, value);
+            if (!check) {
+              this.errorAndExit(
+                `TypeError: Parameter '${
+                  param.value
+                }' is of type ${this.typeRepr(
+                  type
+                )} but received value of type ${this.typeRepr(value)}`
+              );
+            }
+          }
+
+          if (!type) {
+            type = this.newNode(NodeTypeEnum.Any);
+          }
+          if (!value) {
+            if (isCatchAll) {
+              value = this.newNode(NodeTypeEnum.List);
+            } else {
+              value = this.newNode();
+            }
+          }
+
+          funcNode.funcNode.paramNames.push(param.value);
+          funcNode.funcNode.paramsOptional.push(isOptional);
+          funcNode.funcNode.paramsCatchAll.push(isCatchAll);
+          funcNode.funcNode.paramTypes.push(type);
+
+          if (param.value) {
+            tc.typeMap[param.value] = { type, concreteType: value };
+          }
+        });
 
         tc.run();
 
         if (!this.checkTypes(returnType, tc.returnType)) {
           this.errorAndExit(
-            `TypeError: Expected return type ${this.typeRepr(
+            `TypeError: Defined return type is ${this.typeRepr(
               returnType
-            )} but received type ${this.typeRepr(tc.returnType)}`,
+            )} but function returns ${this.typeRepr(tc.returnType)}`,
             tc.returnType
           );
         }
 
         funcNode.funcNode.body = tc.returnType;
+        funcNode.funcNode.returnType = returnType;
 
         return funcNode;
       }
@@ -933,12 +992,21 @@ export class TypeChecker {
           return this.newNode(NodeTypeEnum.Any);
         }
 
-        if (
-          left.type === NodeTypeEnum.Generic ||
-          right.type === NodeTypeEnum.Generic
-        ) {
-          return this.newNode(NodeTypeEnum.Undefined);
+        if (node.value === ",") {
+          const typeList = this.newNode(NodeTypeEnum.TypeList);
+          typeList.nodes = this.removeDuplicateTypes([left, right]);
+          if (typeList.nodes.length === 1) {
+            return typeList.nodes[0];
+          }
+          return typeList;
         }
+
+        // if (
+        //   left.type === NodeTypeEnum.Generic ||
+        //   right.type === NodeTypeEnum.Generic
+        // ) {
+        //   return this.newNode(NodeTypeEnum.Undefined);
+        // }
 
         if (node.value === "=") {
           if (node.left.type === NodeTypeEnum.ID) {
@@ -1344,6 +1412,16 @@ export class TypeChecker {
         }
         return returnType;
       }
+      case NodeTypeEnum.TypeList: {
+        const typeList = this.newNode(NodeTypeEnum.TypeList);
+        typeList.nodes = this.removeDuplicateTypes(
+          node.nodes.map((e) => this.resolveValueType(e))
+        );
+        if (typeList.nodes.length === 0) {
+          return typeList.nodes[0];
+        }
+        return typeList;
+      }
       // todo: Objects etc.
       default: {
         return this.newNode(NodeTypeEnum.Any);
@@ -1591,19 +1669,24 @@ export class TypeChecker {
       this.returnType = this.newNode(NodeTypeEnum.Error);
       return -1;
     }
-    if (
-      this.expectedReturnType &&
-      !this.checkTypes(this.expectedReturnType, this.returnType)
-    ) {
-      this.errorAndExit(
-        `TypeError: Expected return type ${this.typeRepr(
-          this.expectedReturnType
-        )} but received type ${this.typeRepr(this.returnType)}`,
-        this.returnType
-      );
-      this.returnType = this.newNode(NodeTypeEnum.Error);
-      return -1;
-    }
+    // if (this.expectedReturnType) {
+    //   const evaluatedExpectedReturnType = this.resolveType(
+    //     this.expectedReturnType
+    //   );
+    //   const check = this.checkTypes(
+    //     evaluatedExpectedReturnType,
+    //     this.returnType
+    //   );
+    //   if (!check) {
+    //     this.errorAndExit(
+    //       `TypeError: Defined return type is ${this.typeRepr(
+    //         evaluatedExpectedReturnType
+    //       )} but function returns ${this.typeRepr(this.returnType)}`,
+    //       this.returnType
+    //     );
+
+    //   }
+    // }
     return this.typeMap;
   }
 }

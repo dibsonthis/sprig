@@ -290,7 +290,7 @@ export type FuncNode = {
   paramsOptional?: boolean[];
   paramsCatchAll?: boolean[];
   paramNames?: string[];
-  calculatedReturnType?: Node;
+  returnType?: Node;
   typeDef?: Node;
   closures?: SymbolTable;
   defaults?: {};

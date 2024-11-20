@@ -281,6 +281,7 @@ export type FuncNode = {
   paramReqs?: boolean[];
   paramNames?: string[];
   calculatedReturnType?: Node;
+  typeDef?: Node;
   closures?: SymbolTable;
   defaults?: {};
   originFilePath?: string;

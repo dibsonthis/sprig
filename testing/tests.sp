@@ -758,17 +758,28 @@
 // x :: NonNullable(Number)
 // var x;
 
-append :: ([T], T) => [T]
-map :: ([T], ((T, Number) => K)) => [K]
+// append :: ([T], T) => [T]
+// map :: ([T], ((T, Number) => K)) => [K]
 
-const map = (arr, fn) => {
-    res :: [Call(fn(arr[Number], Number))]
-    const res = []
-    for (arr, v, i) {
-        append(res, fn(v, i))
-    }
-    return res
-}
+// const map = (arr, fn) => {
+//     Res :: Call(fn(arr[Number], Number))
+//     res :: [Res]
+//     const res = []
+//     for (arr, v, i) {
+//         append(res, fn(v, i))
+//     }
+//     return res
+// }
 
-var res = map(1..10, (e, i) => "1")
-res = map(1..10, (e, i) => e + i)
+// var res = map(1..10, (e, i) => 8)
+// res = map(1..10, (e, i) => "e + i")
+
+// f :: (T, String) => String
+// const f = (a, b) => {
+//     return a + b
+// }
+
+// var g = f(1, "1")
+// g = true
+
+var g :: String = 100

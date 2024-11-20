@@ -651,7 +651,7 @@ export class TypeChecker {
       case NodeTypeEnum.Decl: {
         const valueType = this.resolveValueType(node.declNode.value);
         const left = node.declNode.id;
-        var type = this.newNode(NodeTypeEnum.Any);
+        var type;
 
         if (this.isTypeNode(left)) {
           const id = left.left;
@@ -664,7 +664,10 @@ export class TypeChecker {
             type,
             concreteType: valueType,
           };
-        } else {
+          return valueType;
+        }
+
+        if (type) {
           const checkTypes = this.checkTypes(type, valueType);
           if (!checkTypes) {
             this.errorAndExit(
@@ -672,13 +675,15 @@ export class TypeChecker {
                 type
               )} but received type ${this.typeRepr(valueType)}`
             );
-          } else {
-            this.typeMap[node.declNode.id.value] = {
-              type,
-              concreteType: valueType,
-            };
           }
+        } else {
+          type = valueType;
         }
+
+        this.typeMap[node.declNode.id.value] = {
+          type,
+          concreteType: valueType,
+        };
 
         return valueType;
       }
@@ -744,7 +749,7 @@ export class TypeChecker {
         if (node.evaluated) {
           return node;
         }
-        var returnType = this.newNode();
+        var returnType = this.newNode(NodeTypeEnum.Any);
         if (this.isTypeNode(node.left)) {
           returnType = this.resolveType(node.left.right);
           node.left = node.left.left;
@@ -932,7 +937,7 @@ export class TypeChecker {
           left.type === NodeTypeEnum.Generic ||
           right.type === NodeTypeEnum.Generic
         ) {
-          return this.newNode(NodeTypeEnum.Any);
+          return this.newNode(NodeTypeEnum.Undefined);
         }
 
         if (node.value === "=") {
@@ -1362,12 +1367,12 @@ export class TypeChecker {
       return true;
     }
 
-    // if (
-    //   type.type === NodeTypeEnum.Generic &&
-    //   valueType.type === NodeTypeEnum.Generic
-    // ) {
-    //   return type.value === valueType.value;
-    // }
+    if (
+      type.type === NodeTypeEnum.Generic &&
+      valueType.type === NodeTypeEnum.Generic
+    ) {
+      return type.value === valueType.value;
+    }
 
     if (type.type === NodeTypeEnum.Generic) {
       return true;

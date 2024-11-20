@@ -786,4 +786,8 @@
 // var g :: Bloop = 100
 // g = true
 
-const add = (a :: Number, b :: String) :: Number => a + b
+const add = (a :: Number, b :: String) :: String => {
+    a + b
+}
+
+const blah = (a :: T, b :: K) :: [T] => [a]

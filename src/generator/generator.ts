@@ -1,4 +1,4 @@
-import { Node, SymbolTable, NodeTypeEnum } from "../types";
+import { Node, SymbolTable, NodeTypeEnum, TypeTable } from "../types";
 import path from "path";
 
 export class Generator {
@@ -19,8 +19,8 @@ export class Generator {
   public variableMap: Record<string, number> = {};
   public hasError = false;
 
-  public typeMap: SymbolTable = {};
-  public tempTypeMap: SymbolTable = {};
+  public typeMap: TypeTable = {};
+  public tempTypeMap: TypeTable = {};
 
   private errorAndContinue(message: string, node?: Node) {
     const errorNode = node ? node : this.node;

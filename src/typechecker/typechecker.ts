@@ -1,4 +1,4 @@
-import { Node, SymbolTable, NodeTypeEnum } from "../types";
+import { Node, SymbolTable, NodeTypeEnum, TypeTable } from "../types";
 import path from "path";
 
 export class TypeChecker {
@@ -9,9 +9,9 @@ export class TypeChecker {
 
   public hasError = false;
 
-  public typeMap: SymbolTable = {};
-  public tempTypeMap: SymbolTable = {};
-  public closureTypeMap: SymbolTable = {};
+  public typeMap: TypeTable = {};
+  public tempTypeMap: TypeTable = {};
+  public closureTypeMap: TypeTable = {};
   public returnType: Node;
   public expectedReturnType: Node;
   public hasReturn: boolean;
@@ -219,7 +219,7 @@ export class TypeChecker {
       ? fn.funcNode.paramTypes.length - 1
       : fn.funcNode.paramTypes.length;
 
-    paramsLength -= fn.funcNode.paramReqs.filter(Boolean).length;
+    paramsLength -= fn.funcNode.paramsOptional.filter(Boolean).length;
 
     if (args.length < paramsLength) {
       return false;
@@ -311,8 +311,7 @@ export class TypeChecker {
         nonGeneric.funcNode = fn.funcNode;
         nonGeneric.isGeneric = false;
         typechecker.typeMap[node.left.value] = {
-          node: nonGeneric,
-          const: true,
+          type: nonGeneric,
         };
         params.forEach((param: Node, index) => {
           var { typeRes: absoluteParam, valueRes: absoluteType } =
@@ -325,7 +324,7 @@ export class TypeChecker {
           // if it already exists, we check the types to make sure
           // it's the same
           if (typechecker.typeMap.hasOwnProperty(absoluteParam.value)) {
-            const existingType = typechecker.typeMap[absoluteParam.value].node;
+            const existingType = typechecker.typeMap[absoluteParam.value].type;
             if (!this.checkTypes(existingType, absoluteType)) {
               this.errorAndExit(
                 `TypeError: Type ${absoluteParam.value} (${this.typeRepr(
@@ -339,8 +338,7 @@ export class TypeChecker {
           }
 
           typechecker.typeMap[absoluteParam.value] = {
-            node: absoluteType,
-            const: true,
+            type: absoluteType,
           };
 
           // Check the typeDef, it it exists, we also add it to the typeMap
@@ -362,7 +360,7 @@ export class TypeChecker {
               // it's the same
               if (typechecker.typeMap.hasOwnProperty(absolutes.typeRes.value)) {
                 const existingType =
-                  typechecker.typeMap[absolutes.typeRes.value].node;
+                  typechecker.typeMap[absolutes.typeRes.value].type;
                 if (!this.checkTypes(existingType, absolutes.valueRes)) {
                   this.errorAndExit(
                     `TypeError: Type ${
@@ -378,8 +376,7 @@ export class TypeChecker {
               }
 
               typechecker.typeMap[absolutes.typeRes.value] = {
-                node: absolutes.valueRes,
-                const: true,
+                type: absolutes.valueRes,
               };
             }
           }
@@ -414,8 +411,7 @@ export class TypeChecker {
           if (typedBody.type === NodeTypeEnum.Generic || typedBody.isGeneric) {
             const absolutes = this.getAbsoluteValueOfType(typedBody, typedRes);
             this.typeMap[absolutes.typeRes.value] = {
-              node: absolutes.valueRes,
-              const: true,
+              type: absolutes.valueRes,
             };
           }
         }
@@ -441,13 +437,13 @@ export class TypeChecker {
           return this.newNode(NodeTypeEnum.Any);
         }
         if (this.tempTypeMap.hasOwnProperty(node.value)) {
-          return this.tempTypeMap[node.value].node;
+          return this.tempTypeMap[node.value].type;
         }
         if (this.typeMap.hasOwnProperty(node.value)) {
-          return this.typeMap[node.value].node;
+          return this.typeMap[node.value].type;
         }
         if (this.closureTypeMap.hasOwnProperty(node.value)) {
-          return this.closureTypeMap[node.value].node;
+          return this.closureTypeMap[node.value].type;
         }
         const generic = this.newNode(NodeTypeEnum.Generic, node.value);
         generic.isGeneric = true;
@@ -540,7 +536,7 @@ export class TypeChecker {
         funcNode.funcNode = {
           params: [],
           paramTypes: [],
-          paramReqs: [],
+          paramsOptional: [],
           body: this.newNode(),
           name: node.meta?.name,
         };
@@ -560,7 +556,7 @@ export class TypeChecker {
             const paramType = this.resolveType(param.right);
             funcNode.funcNode.paramTypes.push(paramType);
             funcNode.funcNode.params.push(paramName);
-            funcNode.funcNode.paramReqs.push(isOptional);
+            funcNode.funcNode.paramsOptional.push(isOptional);
           } else if (
             param.type === NodeTypeEnum.Operator &&
             param.value === "unary..."
@@ -574,7 +570,7 @@ export class TypeChecker {
             const paramName = param.value;
             funcNode.funcNode.paramTypes.push(paramType);
             funcNode.funcNode.params.push(paramName);
-            funcNode.funcNode.paramReqs.push(isOptional);
+            funcNode.funcNode.paramsOptional.push(isOptional);
             if (
               paramType.type === NodeTypeEnum.Generic ||
               paramType.isGeneric
@@ -637,6 +633,10 @@ export class TypeChecker {
     }
   }
 
+  private isTypeNode(node: Node) {
+    return node.type === NodeTypeEnum.Operator && node.value === "::";
+  }
+
   private resolveValueType(node: Node): Node {
     if (!node) {
       return this.newNode(NodeTypeEnum.Any);
@@ -649,34 +649,37 @@ export class TypeChecker {
         return this.newNode(NodeTypeEnum.String);
       }
       case NodeTypeEnum.Decl: {
-        var valueType = this.resolveValueType(node.declNode.value);
+        const valueType = this.resolveValueType(node.declNode.value);
+        const left = node.declNode.id;
+        var type = this.newNode(NodeTypeEnum.Any);
 
-        if (this.typeMap.hasOwnProperty(node.declNode.id.value)) {
-          const type = this.resolveType(node.declNode.id);
-          if (node.value === "let") {
-            this.typeMap[node.declNode.id.value].node = valueType;
-          } else {
-            if (!this.checkTypes(type, valueType)) {
-              this.errorAndExit(
-                `TypeError: Expected type ${this.typeRepr(
-                  type
-                )} but received type ${this.typeRepr(valueType)}`
-              );
-              return this.newNode(NodeTypeEnum.Error);
-            }
-            if (type.type === NodeTypeEnum.Function) {
-              valueType.funcNode.typeDef = type;
-              this.typeMap[node.declNode.id.value].node = valueType;
-            }
-          }
-        } else {
-          this.typeMap[node.declNode.id.value] = {
-            node: valueType,
-            const: node.value === "const",
-            canChange: node.value === "let",
-          };
+        if (this.isTypeNode(left)) {
+          const id = left.left;
+          type = this.resolveType(left.right);
+          node.declNode.id = id;
         }
-        this.typeMap[node.declNode.id.value].node.concreteType = valueType;
+
+        if (node.value === "let") {
+          this.typeMap[node.declNode.id.value] = {
+            type,
+            concreteType: valueType,
+          };
+        } else {
+          const checkTypes = this.checkTypes(type, valueType);
+          if (!checkTypes) {
+            this.errorAndExit(
+              `TypeError: Expected type ${this.typeRepr(
+                type
+              )} but received type ${this.typeRepr(valueType)}`
+            );
+          } else {
+            this.typeMap[node.declNode.id.value] = {
+              type,
+              concreteType: valueType,
+            };
+          }
+        }
+
         return valueType;
       }
       case NodeTypeEnum.Block: {
@@ -696,11 +699,11 @@ export class TypeChecker {
       case NodeTypeEnum.ID: {
         var res = this.newNode(NodeTypeEnum.Any);
         if (this.tempTypeMap.hasOwnProperty(node.value)) {
-          res = this.tempTypeMap[node.value].node;
+          res = this.tempTypeMap[node.value].type;
         } else if (this.typeMap.hasOwnProperty(node.value)) {
-          res = this.typeMap[node.value].node;
+          res = this.typeMap[node.value].type;
         } else if (this.closureTypeMap.hasOwnProperty(node.value)) {
-          res = this.closureTypeMap[node.value].node;
+          res = this.closureTypeMap[node.value].type;
         }
         return res;
       }
@@ -741,81 +744,156 @@ export class TypeChecker {
         if (node.evaluated) {
           return node;
         }
+        var returnType = this.newNode();
+        if (this.isTypeNode(node.left)) {
+          returnType = this.resolveType(node.left.right);
+          node.left = node.left.left;
+        }
+
         const funcNode = this.newNode(NodeTypeEnum.Function);
         funcNode.funcNode = {
           params: [],
           paramTypes: [],
-          paramReqs: [],
+          paramsOptional: [],
+          paramsCatchAll: [],
+          paramNames: [],
           body: this.newNode(),
           name: node.meta?.name,
         };
         funcNode.value = node;
         funcNode.evaluated = true;
 
-        const paramNames = [];
-
         const tc = new TypeChecker([node.right], this.filePath);
 
-        this.flattenChildren(node.left?.node, [","]).forEach((param, index) => {
-          var isOptional = false;
-          if (
-            param.type === NodeTypeEnum.Operator &&
-            param.value === "unary!"
-          ) {
-            isOptional = true;
-            param = param.right;
-          }
-          if (param.type === NodeTypeEnum.Operator && param.value === "=") {
-            const paramName = param.left.value;
-            const paramType = this.resolveValueType(param.right);
-            // this.tempTypeMap[paramName] = { node: paramType, const: true };
-            tc.typeMap[paramName] = { node: paramType, const: true };
-            paramNames.push(paramName);
-            funcNode.funcNode.paramTypes.push(paramType);
-            funcNode.funcNode.params.push(paramName);
-            funcNode.funcNode.paramReqs.push(isOptional);
-          } else if (
-            param.type === NodeTypeEnum.Operator &&
-            param.value === "unary..."
-          ) {
-            const paramName = param.right.value;
-            const paramType = this.newNode(NodeTypeEnum.CatchAllParam);
-            paramType.value = this.newNode(NodeTypeEnum.Any);
-            funcNode.funcNode.paramTypes.push(paramType);
-            funcNode.funcNode.params.push(paramName);
-            // this.tempTypeMap[paramName] = { node: paramType, const: true };
-            tc.typeMap[paramName] = { node: paramType, const: true };
-            paramNames.push(paramName);
-          } else {
-            const paramName = param.value;
-            var paramType = this.resolveValueType(param);
-            if (
-              paramType.type === NodeTypeEnum.Generic ||
-              paramType.type === NodeTypeEnum.Any
-            ) {
-              // we look for the generic typename and change it
-              const fnType = this.typeMap[node.meta?.name]?.node;
-              const resolvedParam =
-                fnType?.funcNode?.paramTypes?.[index] ?? paramType;
-              paramType = resolvedParam;
+        this.flattenChildren(node.left?.node, [","]).forEach(
+          (param: Node, index) => {
+            var type;
+            var value;
+            var isOptional = false;
+            var isCatchAll = false;
+
+            if (param.type === NodeTypeEnum.Operator && param.value === "=") {
+              value = this.resolveValueType(param.right);
+              param = param.left;
             }
-            // this.tempTypeMap[paramName] = { node: paramType, const: true };
-            tc.typeMap[paramName] = { node: paramType, const: true };
-            paramNames.push(paramName);
-            funcNode.funcNode.paramTypes.push(paramType);
-            funcNode.funcNode.params.push(paramName);
-            funcNode.funcNode.paramReqs.push(isOptional);
-            if (
-              paramType.type === NodeTypeEnum.Generic ||
-              paramType.isGeneric ||
-              paramType.type === NodeTypeEnum.Any
-            ) {
-              funcNode.isGeneric = true;
+
+            if (this.isTypeNode(param)) {
+              type = this.resolveType(param.right);
+              param = param.left;
             }
+
+            if (
+              param.type === NodeTypeEnum.Operator &&
+              param.value === "unary!"
+            ) {
+              isOptional = true;
+              param = param.right;
+            }
+
+            if (
+              param.type === NodeTypeEnum.Operator &&
+              param.value === "unary..."
+            ) {
+              isCatchAll = true;
+              param = param.right;
+            }
+
+            // At this point, param is an ID
+            // we'll typecheck it if it has a value
+            if (type && value) {
+              const check = this.checkTypes(type, value);
+              if (!check) {
+                this.errorAndExit(
+                  `TypeError: Parameter '${
+                    param.value
+                  }' is of type ${this.typeRepr(
+                    type
+                  )} but received value of type ${this.typeRepr(value)}`
+                );
+              }
+            }
+
+            if (!type) {
+              type = this.newNode(NodeTypeEnum.Any);
+            }
+            if (!value) {
+              if (isCatchAll) {
+                value = this.newNode(NodeTypeEnum.List);
+              } else {
+                value = this.newNode();
+              }
+            }
+
+            funcNode.funcNode.paramNames.push(param.value);
+            funcNode.funcNode.paramsOptional.push(isOptional);
+            funcNode.funcNode.paramsCatchAll.push(isCatchAll);
+            funcNode.funcNode.paramTypes.push(type);
+
+            if (param.value) {
+              tc.typeMap[param.value] = { type, concreteType: value };
+            }
+
+            // if (param.type === NodeTypeEnum.Operator && param.value === "=") {
+            //   const paramName = param.left.value;
+            //   const paramType = this.resolveValueType(param.right);
+            //   // this.tempTypeMap[paramName] = { node: paramType, const: true };
+            //   tc.typeMap[paramName] = { type: paramType };
+            //   paramNames.push(paramName);
+            //   funcNode.funcNode.paramTypes.push(paramType);
+            //   funcNode.funcNode.params.push(paramName);
+            //   funcNode.funcNode.paramsOptional.push(isOptional);
+            // } else if (
+            //   param.type === NodeTypeEnum.Operator &&
+            //   param.value === "unary..."
+            // ) {
+            //   const paramName = param.right.value;
+            //   const paramType = this.newNode(NodeTypeEnum.CatchAllParam);
+            //   paramType.value = this.newNode(NodeTypeEnum.Any);
+            //   funcNode.funcNode.paramTypes.push(paramType);
+            //   funcNode.funcNode.params.push(paramName);
+            //   // this.tempTypeMap[paramName] = { node: paramType, const: true };
+            //   tc.typeMap[paramName] = { type: paramType };
+            //   paramNames.push(paramName);
+            // } else {
+            //   const paramName = param.value;
+            //   var paramType = this.resolveValueType(param);
+            //   if (
+            //     paramType.type === NodeTypeEnum.Generic ||
+            //     paramType.type === NodeTypeEnum.Any
+            //   ) {
+            //     // we look for the generic typename and change it
+            //     const fnType = this.typeMap[node.meta?.name]?.type;
+            //     const resolvedParam =
+            //       fnType?.funcNode?.paramTypes?.[index] ?? paramType;
+            //     paramType = resolvedParam;
+            //   }
+            //   // this.tempTypeMap[paramName] = { node: paramType, const: true };
+            //   tc.typeMap[paramName] = { type: paramType };
+            //   paramNames.push(paramName);
+            //   funcNode.funcNode.paramTypes.push(paramType);
+            //   funcNode.funcNode.params.push(paramName);
+            //   funcNode.funcNode.paramsOptional.push(isOptional);
+            //   if (
+            //     paramType.type === NodeTypeEnum.Generic ||
+            //     paramType.isGeneric ||
+            //     paramType.type === NodeTypeEnum.Any
+            //   ) {
+            //     funcNode.isGeneric = true;
+            //   }
+            // }
           }
-        });
+        );
 
         tc.run();
+
+        if (!this.checkTypes(returnType, tc.returnType)) {
+          this.errorAndExit(
+            `TypeError: Expected return type ${this.typeRepr(
+              returnType
+            )} but received type ${this.typeRepr(tc.returnType)}`,
+            tc.returnType
+          );
+        }
 
         funcNode.funcNode.body = tc.returnType;
 
@@ -863,7 +941,7 @@ export class TypeChecker {
             const valueType = this.resolveValueType(node.right);
             var canChange = this.typeMap[node.left.value].canChange;
             if (canChange) {
-              this.typeMap[node.left.value].node = valueType;
+              this.typeMap[node.left.value].type = valueType;
             } else {
               if (!this.checkTypes(type, valueType)) {
                 this.errorAndExit(
@@ -1234,13 +1312,13 @@ export class TypeChecker {
         if (sections.length > 1) {
           const valueName = sections[1].value;
           const valueType = this.getListType(arr);
-          this.tempTypeMap[valueName] = { node: valueType, const: true };
+          this.tempTypeMap[valueName] = { type: valueType };
           _valueName = valueName;
         }
         if (sections.length > 2) {
           const indexName = sections[1].index;
           const indexType = this.newNode(NodeTypeEnum.Number);
-          this.tempTypeMap[indexName] = { node: indexType, const: true };
+          this.tempTypeMap[indexName] = { type: indexType };
           _indexName = indexName;
         }
         for (const expr of node.right.nodes) {
@@ -1480,7 +1558,7 @@ export class TypeChecker {
           };
         }
       }
-      this.typeMap[id] = { node: type, const: true };
+      this.typeMap[id] = { type };
       return this.newNode();
     } else {
       return this.inTypeLand

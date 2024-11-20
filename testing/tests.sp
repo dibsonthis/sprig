@@ -782,4 +782,8 @@
 // var g = f(1, "1")
 // g = true
 
-var g :: String = 100
+// Bloop :: String | Number
+// var g :: Bloop = 100
+// g = true
+
+const add = (a :: Number, b :: String) :: Number => a + b

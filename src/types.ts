@@ -254,6 +254,15 @@ export type CallFrame = {
   coroutine?: Node;
 };
 
+export type TypeTable = Record<
+  string,
+  {
+    type: Node;
+    concreteType?: Node;
+    canChange?: boolean;
+  }
+>;
+
 export type SymbolTable = Record<
   string,
   {
@@ -278,7 +287,8 @@ export type FuncNode = {
   params: Node[];
   body: Node;
   paramTypes?: Node[];
-  paramReqs?: boolean[];
+  paramsOptional?: boolean[];
+  paramsCatchAll?: boolean[];
   paramNames?: string[];
   calculatedReturnType?: Node;
   typeDef?: Node;

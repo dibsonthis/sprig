@@ -290,6 +290,7 @@ export type FuncNode = {
   paramsOptional?: boolean[];
   paramsCatchAll?: boolean[];
   paramNames?: string[];
+  paramDefaultValues?: Node[];
   returnType?: Node;
   typeDef?: Node;
   closures?: SymbolTable;
@@ -306,6 +307,7 @@ export type FuncNode = {
   }[];
   variableMap?: Record<string, number>;
   meta?: {};
+  type?: Node;
 };
 
 export type NativeNode = {
@@ -361,6 +363,7 @@ export type Node = {
   isType?: boolean;
   isGeneric?: boolean;
   concreteType?: Node;
+  rawType?: Node;
 };
 
 export type NodePayload = {

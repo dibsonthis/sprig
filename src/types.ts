@@ -308,6 +308,7 @@ export type FuncNode = {
   variableMap?: Record<string, number>;
   meta?: {};
   type?: Node;
+  implementation?: Node;
 };
 
 export type NativeNode = {

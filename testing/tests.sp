@@ -786,8 +786,28 @@
 // var g :: Bloop = 100
 // g = true
 
-add :: (a :: Number, b :: Number, c :: Number) => Number
-const add = (a = 7, b = 20, c = 100) => a + b + c
 
-const g :: Number = add(1, 1, 1)
+
+
+// add :: (a :: Number, b :: Number) => Number
+
+// const add = (a, b) => a + b
+
+// const g = add(30, 4)
+
+// const f :: Number = g * 2
+
+// print(f)
+
+// type :: (value) => String
+
+// var t :: String | Number = type(10)
+// t = 10
+// t = true
+
+// print(t)
+
+bloop :: (value :: T) => [T]
+const bloop = (value) => [value]
+var g :: [String] = bloop("hello")
 print(g)

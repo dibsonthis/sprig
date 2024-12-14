@@ -221,7 +221,7 @@ export class TypeChecker {
 
     paramsLength -= fn.funcNode.paramsOptional.filter(Boolean).length;
 
-    const defaultsLength = fn.funcNode.paramDefaultValues.length;
+    const defaultsLength = fn.funcNode.paramDefaultValues?.length ?? 0;
 
     if (defaultsLength) {
       const diff = paramsLength - args.length;
@@ -271,11 +271,6 @@ export class TypeChecker {
     }
 
     const rawArgs: Node[] = this.flattenChildren(node.right.node, [","]);
-    // const sortedArgs: Node[] = Array.from(
-    //   { length: func.funcNode.paramTypes.length },
-    //   // (_, i) => this.newNode()
-    //   (_, i) => undefined
-    // );
     const sortedArgs: Node[] = [];
 
     rawArgs.forEach((arg, index) => {
@@ -327,7 +322,11 @@ export class TypeChecker {
       return func.funcNode.body;
     }
 
-    const tc = new TypeChecker([func.funcNode.body], this.filePath);
+    // const tc = new TypeChecker([func.funcNode.body], this.filePath);
+    const tc = new TypeChecker(
+      [func.funcNode.implementation.funcNode.body],
+      this.filePath
+    );
 
     func.funcNode.paramTypes.forEach((paramType, index) => {
       const paramName = func.funcNode.paramNames[index];
@@ -810,6 +809,7 @@ export class TypeChecker {
 
         if (valueType.type === NodeTypeEnum.Function) {
           type = this.resolveType(left);
+          type.funcNode.implementation = valueType;
           // If the type is not defined, add it
           if (type.type === NodeTypeEnum.Generic) {
             type = valueType;

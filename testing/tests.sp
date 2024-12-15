@@ -787,6 +787,7 @@
 // g = true
 
 
+// ==== Works ==== //
 
 
 // add :: (a :: Number, b :: Number) => Number
@@ -807,15 +808,15 @@
 
 // print(t)
 
-bloop :: (value :: T) => [T]
-const str = "100"
-const bloop = (value) => [value, str]
-var g = bloop("bye")
-print(g)
+// bloop :: (value :: T) => [T]
+// const str = "100"
+// const bloop = (value) => [value, str]
+// var g = bloop("bye")
+// print(g)
 
-bloop2 :: (v::T, c::Number) => Number
-const bloop2 = (v, c) => c
-const h = bloop2(true, 500)
+// bloop2 :: (v::T, c::Number) => Number
+// const bloop2 = (v, c) => c
+// const h = bloop2(true, 500)
 
 fib :: (n::Number) => Number
 
@@ -829,15 +830,37 @@ const fib = (n) => {
     return 0
 }
 
-const fib5 = fib(10)
-print(fib5)
+// const fib5 = fib(10)
+// print(fib5)
 
 Matrix :: [[Number]]
 const nums = 1..10
 const matrix :: Matrix = [[100, 100, 100], nums + [...nums]]
 
 createMatrix :: (n::Number, m::Number) => Matrix
-const createMatrix = (n, m) => [n] * m
+const createMatrix = (n, m = 5) => [n] * m
 
-const m :: Matrix = createMatrix(10, 5)
-print({m})
+Person :: {
+    name: String,
+    age: Number,
+    matrix: Matrix,
+    address: {
+        street: String
+    }
+}
+
+createPerson :: (name::String, age::Number) => Person
+const createPerson = (name, age) => {
+    return {
+        name: name, 
+        age: age, 
+        matrix: createMatrix(fib(10)), 
+        address: {
+            street: "123 Fake Street"
+    }}
+}
+
+var p :: Person = createPerson("Jason", 45)
+p = createPerson("Jack", 33)
+
+print(p)

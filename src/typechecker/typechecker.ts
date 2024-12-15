@@ -68,6 +68,32 @@ export class TypeChecker {
         repr += fnName + `(${this.typeRepr(arg)})`;
         break;
       }
+      case NodeTypeEnum.Object:
+      case NodeTypeEnum.Object: {
+        var repr = "{ ";
+        const keys = Object.keys(node.value);
+        for (let i = 0; i < keys.length; i++) {
+          const key = keys[i];
+          let value = node.value[key];
+
+          if (value?.type === NodeTypeEnum.String) {
+            repr += `${key}: ${this.typeRepr(value)}`;
+          } else {
+            if (value == node) {
+              repr += "{...}";
+            } else if (value.meta?.hiddenProp) {
+              continue;
+            } else {
+              repr += `${key}: ${this.typeRepr(value)}`;
+            }
+          }
+          if (i < keys.length - 1) {
+            repr += ", ";
+          }
+        }
+        repr += " }";
+        return repr;
+      }
       default: {
         repr += NodeTypeEnum[node.type];
         break;
@@ -778,6 +804,33 @@ export class TypeChecker {
         typeList.nodes = types;
         typeList.meta = node.meta;
         return typeList;
+      }
+      case NodeTypeEnum.Object: {
+        const typeObject = this.newNode(NodeTypeEnum.Object, {});
+        typeObject.isType = true;
+        if (
+          node.node?.type === NodeTypeEnum.Operator &&
+          node.node?.value === ":"
+        ) {
+          var propName = node.node.left;
+          if (propName.type === NodeTypeEnum.List) {
+            propName = this.resolveType(propName.node);
+          }
+          typeObject.value[propName.value] = this.resolveType(node.node.right);
+        } else if (
+          node.node?.type === NodeTypeEnum.Operator &&
+          node.node?.value === ","
+        ) {
+          const props = this.flattenChildren(node.node, [","]);
+          props.forEach((prop) => {
+            var propName = prop.left;
+            if (propName.type === NodeTypeEnum.List) {
+              propName = this.resolveType(propName.node);
+            }
+            typeObject.value[propName.value] = this.resolveType(prop.right);
+          });
+        }
+        return typeObject;
       }
       default: {
         return this.newNode(NodeTypeEnum.Any);
@@ -1512,7 +1565,37 @@ export class TypeChecker {
         }
         return typeList;
       }
-      // todo: Objects etc.
+      case NodeTypeEnum.Object: {
+        const typeObject = this.newNode(NodeTypeEnum.Object, {});
+        typeObject.isType = true;
+        if (
+          node.node?.type === NodeTypeEnum.Operator &&
+          node.node?.value === ":"
+        ) {
+          var propName = node.node.left;
+          if (propName.type === NodeTypeEnum.List) {
+            propName = this.resolveValueType(propName.node);
+          }
+          typeObject.value[propName.value] = this.resolveValueType(
+            node.node.right
+          );
+        } else if (
+          node.node?.type === NodeTypeEnum.Operator &&
+          node.node?.value === ","
+        ) {
+          const props = this.flattenChildren(node.node, [","]);
+          props.forEach((prop) => {
+            var propName = prop.left;
+            if (propName.type === NodeTypeEnum.List) {
+              propName = this.resolveValueType(propName.node);
+            }
+            typeObject.value[propName.value] = this.resolveValueType(
+              prop.right
+            );
+          });
+        }
+        return typeObject;
+      }
       default: {
         return this.newNode(NodeTypeEnum.Any);
       }
@@ -1626,6 +1709,34 @@ export class TypeChecker {
         return false;
       }
       return true;
+    }
+
+    if (
+      type.type === NodeTypeEnum.Object &&
+      valueType.type === NodeTypeEnum.Object
+    ) {
+      const typeProps: Record<string, Node> = type.value;
+      const valueProps: Record<string, Node> = valueType.value;
+      const typePropsLength = Object.keys(typeProps).length;
+      const valuePropsLength = Object.keys(valueProps).length;
+      if (typePropsLength !== valuePropsLength) {
+        return false;
+      }
+
+      var passedPropCheck = true;
+
+      Object.entries(typeProps).forEach(([key, prop]) => {
+        const valueProp = valueProps[key];
+        if (!valueProp) {
+          passedPropCheck = false;
+        }
+        const check = this.checkTypes(prop, valueProp);
+        if (!check) {
+          passedPropCheck = false;
+        }
+      });
+
+      return passedPropCheck;
     }
 
     if (type.type === valueType.type) {

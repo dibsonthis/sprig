@@ -808,6 +808,8 @@
 // print(t)
 
 bloop :: (value :: T) => [T]
-const bloop = (value) => [value]
-var g :: [String] = bloop("hello")
+const str = "100"
+const bloop = (value) => [value, str]
+var g = bloop("bye")
+g = 20
 print(g)

@@ -328,6 +328,8 @@ export class TypeChecker {
       this.filePath
     );
 
+    tc.typeMap = { ...this.typeMap };
+
     func.funcNode.paramTypes.forEach((paramType, index) => {
       const paramName = func.funcNode.paramNames[index];
       var value = sortedArgs[index];
@@ -810,6 +812,8 @@ export class TypeChecker {
         if (valueType.type === NodeTypeEnum.Function) {
           type = this.resolveType(left);
           type.funcNode.implementation = valueType;
+          type.funcNode.implementation.funcNode.body =
+            node.declNode.value.right;
           // If the type is not defined, add it
           if (type.type === NodeTypeEnum.Generic) {
             type = valueType;
@@ -945,6 +949,7 @@ export class TypeChecker {
         funcNode.evaluated = true;
 
         const tc = new TypeChecker([node.right], this.filePath);
+        tc.typeMap = { ...this.typeMap };
 
         this.flattenChildren(node.left?.node, [","]).forEach(
           (param: Node, index) => {

@@ -322,7 +322,6 @@ export class TypeChecker {
       return func.funcNode.body;
     }
 
-    // const tc = new TypeChecker([func.funcNode.body], this.filePath);
     const tc = new TypeChecker(
       [func.funcNode.implementation.funcNode.body],
       this.filePath
@@ -811,12 +810,13 @@ export class TypeChecker {
 
         if (valueType.type === NodeTypeEnum.Function) {
           type = this.resolveType(left);
-          type.funcNode.implementation = valueType;
-          type.funcNode.implementation.funcNode.body =
-            node.declNode.value.right;
           // If the type is not defined, add it
           if (type.type === NodeTypeEnum.Generic) {
             type = valueType;
+          } else {
+            type.funcNode.implementation = valueType;
+            type.funcNode.implementation.funcNode.body =
+              node.declNode.value.right;
           }
         }
 
@@ -1057,7 +1057,10 @@ export class TypeChecker {
         );
       }
       case NodeTypeEnum.Operator: {
-        const left = this.resolveValueType(node.left);
+        var left;
+        if (!node.meta?.unary) {
+          left = this.resolveValueType(node.left);
+        }
 
         if (node.value === "else") {
           if (node.right.type === NodeTypeEnum.IfStatement) {
@@ -1072,7 +1075,10 @@ export class TypeChecker {
 
         const right = this.resolveValueType(node.right);
 
-        if (left.type === NodeTypeEnum.Any || right.type === NodeTypeEnum.Any) {
+        if (
+          left?.type === NodeTypeEnum.Any ||
+          right.type === NodeTypeEnum.Any
+        ) {
           return this.newNode(NodeTypeEnum.Any);
         }
 
@@ -1616,7 +1622,7 @@ export class TypeChecker {
           return false;
         }
       });
-      if (!this.checkTypes(type.funcNode.body, valueType.funcNode.body)) {
+      if (!this.checkTypes(type.funcNode.body, valueType.funcNode.returnType)) {
         return false;
       }
       return true;

@@ -811,5 +811,33 @@ bloop :: (value :: T) => [T]
 const str = "100"
 const bloop = (value) => [value, str]
 var g = bloop("bye")
-g = 20
 print(g)
+
+bloop2 :: (v::T, c::Number) => Number
+const bloop2 = (v, c) => c
+const h = bloop2(true, 500)
+
+fib :: (n::Number) => Number
+
+const fib = (n) => {
+    if (n <= 1) {
+        return n
+    } else {
+        return fib(n - 1) + fib(n - 2)
+    }
+
+    return 0
+}
+
+const fib5 = fib(10)
+print(fib5)
+
+Matrix :: [[Number]]
+const nums = 1..10
+const matrix :: Matrix = [[100, 100, 100], nums + [...nums]]
+
+createMatrix :: (n::Number, m::Number) => Matrix
+const createMatrix = (n, m) => [n] * m
+
+const m :: Matrix = createMatrix(10, 5)
+print({m})

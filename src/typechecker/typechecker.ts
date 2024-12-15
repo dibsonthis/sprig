@@ -68,7 +68,6 @@ export class TypeChecker {
         repr += fnName + `(${this.typeRepr(arg)})`;
         break;
       }
-      case NodeTypeEnum.Object:
       case NodeTypeEnum.Object: {
         var repr = "{ ";
         const keys = Object.keys(node.value);
@@ -808,7 +807,10 @@ export class TypeChecker {
       case NodeTypeEnum.Object: {
         const typeObject = this.newNode(NodeTypeEnum.Object, {});
         typeObject.isType = true;
-        if (
+        if (node.node?.type === NodeTypeEnum.ID) {
+          const propName = node.node;
+          typeObject.value[propName.value] = this.resolveType(propName);
+        } else if (
           node.node?.type === NodeTypeEnum.Operator &&
           node.node?.value === ":"
         ) {
@@ -823,11 +825,16 @@ export class TypeChecker {
         ) {
           const props = this.flattenChildren(node.node, [","]);
           props.forEach((prop) => {
-            var propName = prop.left;
-            if (propName.type === NodeTypeEnum.List) {
-              propName = this.resolveType(propName.node);
+            if (prop.type === NodeTypeEnum.ID) {
+              const propName = prop;
+              typeObject.value[propName.value] = this.resolveType(propName);
+            } else {
+              var propName = prop.left;
+              if (propName.type === NodeTypeEnum.List) {
+                propName = this.resolveType(propName.node);
+              }
+              typeObject.value[propName.value] = this.resolveType(prop.right);
             }
-            typeObject.value[propName.value] = this.resolveType(prop.right);
           });
         }
         return typeObject;
@@ -1568,7 +1575,10 @@ export class TypeChecker {
       case NodeTypeEnum.Object: {
         const typeObject = this.newNode(NodeTypeEnum.Object, {});
         typeObject.isType = true;
-        if (
+        if (node.node?.type === NodeTypeEnum.ID) {
+          const propName = node.node;
+          typeObject.value[propName.value] = this.resolveValueType(propName);
+        } else if (
           node.node?.type === NodeTypeEnum.Operator &&
           node.node?.value === ":"
         ) {
@@ -1585,13 +1595,19 @@ export class TypeChecker {
         ) {
           const props = this.flattenChildren(node.node, [","]);
           props.forEach((prop) => {
-            var propName = prop.left;
-            if (propName.type === NodeTypeEnum.List) {
-              propName = this.resolveValueType(propName.node);
+            if (prop.type === NodeTypeEnum.ID) {
+              const propName = prop;
+              typeObject.value[propName.value] =
+                this.resolveValueType(propName);
+            } else {
+              var propName = prop.left;
+              if (propName.type === NodeTypeEnum.List) {
+                propName = this.resolveValueType(propName.node);
+              }
+              typeObject.value[propName.value] = this.resolveValueType(
+                prop.right
+              );
             }
-            typeObject.value[propName.value] = this.resolveValueType(
-              prop.right
-            );
           });
         }
         return typeObject;

@@ -852,8 +852,8 @@ Person :: {
 createPerson :: (name::String, age::Number) => Person
 const createPerson = (name, age) => {
     return {
-        name: name, 
-        age: age, 
+        name, 
+        age, 
         matrix: createMatrix(fib(10)), 
         address: {
             street: "123 Fake Street"

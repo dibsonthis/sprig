@@ -394,6 +394,19 @@ export type ObjectType = {
   value: Record<string, Type>;
 };
 
+export type RawType = {
+  value: Type;
+};
+
+export type ErrorType = {
+  value: Type;
+};
+
+export type GenericType = {
+  value?: string;
+  extention?: Type;
+};
+
 export type AnyType = {};
 
 export type FunctionType = {
@@ -402,9 +415,11 @@ export type FunctionType = {
   paramTypes?: Type[];
   paramOptionality?: boolean[];
   paramDefaultTypes?: Type[];
+  paramCatchAll?: boolean[];
   returnType?: Type;
   isGeneric?: boolean;
-  value: Node;
+  implementation?: Node;
+  value?: Node;
 };
 
 export type Type = {
@@ -417,10 +432,15 @@ export type Type = {
   listValue?: ListType;
   objectValue?: ObjectType;
   typeListValue?: TypeListType;
+  rawValue?: RawType;
+  genericValue?: GenericType;
+  /* meta */
+  typeAlias?: string;
+  isGeneric?: boolean;
 };
 
 export const newType = (
-  type: NodeTypeEnum,
+  type?: NodeTypeEnum,
   value?:
     | StringType
     | NumberType
@@ -429,8 +449,11 @@ export const newType = (
     | ListType
     | ObjectType
     | TypeListType
+    | RawType
+    | ErrorType
+    | GenericType
 ) => {
-  const t: Type = { type };
+  const t: Type = { type: type ?? NodeTypeEnum.Undefined };
   switch (type) {
     case NodeTypeEnum.String: {
       t.stringValue = value as StringType;
@@ -450,6 +473,22 @@ export const newType = (
     }
     case NodeTypeEnum.Object: {
       t.objectValue = value as ObjectType;
+      return t;
+    }
+    case NodeTypeEnum.Raw: {
+      t.rawValue = value as RawType;
+      return t;
+    }
+    case NodeTypeEnum.TypeList: {
+      t.typeListValue = (value as TypeListType) ?? { values: [] };
+      return t;
+    }
+    case NodeTypeEnum.Generic: {
+      t.genericValue = (value as GenericType) ?? {};
+      return t;
+    }
+    case NodeTypeEnum.Function: {
+      t.functionValue = (value as FunctionType) ?? {};
       return t;
     }
     default: {

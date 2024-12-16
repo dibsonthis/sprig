@@ -890,4 +890,5 @@
 // const g :: String = blah(10, (val) => val)
 // print(g)
 
-yesOrNo :: "yes" | "no"
+const x :: Number = 56
+var g :: String = x

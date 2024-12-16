@@ -1,4 +1,11 @@
-import { Node, SymbolTable, NodeTypeEnum, TypeTable } from "../types";
+import {
+  Node,
+  SymbolTable,
+  NodeTypeEnum,
+  TypeTable,
+  Type,
+  newType,
+} from "../types";
 import path from "path";
 
 export class TypeChecker {
@@ -8,6 +15,8 @@ export class TypeChecker {
   public filePath: string;
 
   public hasError = false;
+
+  public _typeMap: Record<string, Type> = {};
 
   public typeMap: TypeTable = {};
   public tempTypeMap: TypeTable = {};
@@ -286,6 +295,13 @@ export class TypeChecker {
       if (!this.checkTypes(fnParam, arg)) {
         return false;
       }
+
+      if (fnParam.type === NodeTypeEnum.Function) {
+        fn.value = arg.value;
+        // fn.funcNode.paramTypes[index].funcNode.implementation = fnParam;
+        // fn.funcNode.paramTypes[index].funcNode.implementation.funcNode.body =
+        //   arg.funcNode.body;
+      }
     }
 
     return true;
@@ -350,7 +366,11 @@ export class TypeChecker {
       );
     }
 
-    if (!func.isGeneric) {
+    if (func.funcNode?.returnType?.isGeneric) {
+      func.isGeneric = true;
+    }
+
+    if (!func.isGeneric && !func.funcNode?.implementation) {
       return func.funcNode.body;
     }
 
@@ -366,12 +386,23 @@ export class TypeChecker {
       const paramName = func.funcNode.paramNames[index];
       var value = sortedArgs[index];
       if (paramName) {
-        tc.typeMap[paramName] = { type: value };
+        if (paramType.type === NodeTypeEnum.Function) {
+          // tc.typeMap[paramName] = { type: paramType };
+          tc.typeMap[paramName] = { type: tc.resolveType(paramType.value) };
+          // tc.typeMap[paramName].type.funcNode.implementation = value;
+          tc.typeMap[paramName].type.funcNode.implementation =
+            tc.resolveValueType(value.value);
+        } else {
+          tc.typeMap[paramName] = { type: value };
+        }
       }
       if (paramType.isGeneric || paramType.type === NodeTypeEnum.Generic) {
         const absolutes = this.getAbsoluteValueOfType(paramType, value);
         // If a generic has been defined already, we typecheck it
-        if (tc.typeMap[absolutes.typeRes.value]) {
+        if (
+          typeof absolutes.typeRes.value === "string" &&
+          tc.typeMap[absolutes.typeRes.value]
+        ) {
           const existingGeneric = tc.typeMap[absolutes.typeRes.value];
           const check = tc.checkTypes(existingGeneric.type, absolutes.valueRes);
           if (!check) {
@@ -383,7 +414,7 @@ export class TypeChecker {
               } (${this.typeRepr(existingGeneric.type)})`
             );
           }
-        } else {
+        } else if (typeof absolutes.typeRes.value === "string") {
           tc.typeMap[absolutes.typeRes.value] = { type: absolutes.valueRes };
         }
       }

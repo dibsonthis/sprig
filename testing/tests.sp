@@ -868,8 +868,26 @@
 // proxy :: (object :: T is Object, handler :: Object) => T
 // const prox :: String = proxy(p, {})
 
-objToList :: (obj :: T && Object) => [{id: T, nums: [Number]}]
-const objToList = (obj) => [{id: obj, nums: 1..10}]
+// objToList :: (obj :: T && Object) => [{id: T, nums: [Number]}]
+// const objToList = (obj) => [{id: obj, nums: 1..10}]
 
-var x = objToList({a: 100})
-print(x)
+// var x = objToList({a: 100})
+// print(x)
+
+
+
+
+// map :: (arr :: [T], fn :: (elem :: T, index :: Number) => K) => [K]
+// const map = (arr, fn) => {
+//     return [fn(arr[0], 0)]
+// }
+
+// const g :: String = map(1..10, (elem, index) => elem)
+
+// blah :: (v :: T, fn :: (val :: T) => K) => K
+// const blah = (v, fn) => fn(v)
+
+// const g :: String = blah(10, (val) => val)
+// print(g)
+
+yesOrNo :: "yes" | "no"

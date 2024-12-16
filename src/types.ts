@@ -368,10 +368,92 @@ export type Node = {
   extention?: Node;
 };
 
-export type NodePayload = {
-  left?: Node;
-  right: Node;
-  token?: string;
-  col: number;
-  line: number;
+/* Types */
+
+export type StringType = {
+  value: string;
+};
+
+export type NumberType = {
+  value: number;
+};
+
+export type BooleanType = {
+  value: boolean;
+};
+
+export type ListType = {
+  value: Type;
+};
+
+export type TypeListType = {
+  values: Type[];
+};
+
+export type ObjectType = {
+  value: Record<string, Type>;
+};
+
+export type AnyType = {};
+
+export type FunctionType = {
+  name?: string;
+  paramNames?: string[];
+  paramTypes?: Type[];
+  paramOptionality?: boolean[];
+  paramDefaultTypes?: Type[];
+  returnType?: Type;
+  isGeneric?: boolean;
+  value: Node;
+};
+
+export type Type = {
+  type: NodeTypeEnum;
+  canChange?: boolean;
+  stringValue?: StringType;
+  numberValue?: NumberType;
+  booleanValue?: BooleanType;
+  functionValue?: FunctionType;
+  listValue?: ListType;
+  objectValue?: ObjectType;
+  typeListValue?: TypeListType;
+};
+
+export const newType = (
+  type: NodeTypeEnum,
+  value?:
+    | StringType
+    | NumberType
+    | BooleanType
+    | FunctionType
+    | ListType
+    | ObjectType
+    | TypeListType
+) => {
+  const t: Type = { type };
+  switch (type) {
+    case NodeTypeEnum.String: {
+      t.stringValue = value as StringType;
+      return t;
+    }
+    case NodeTypeEnum.Number: {
+      t.numberValue = value as NumberType;
+      return t;
+    }
+    case NodeTypeEnum.Boolean: {
+      t.booleanValue = value as BooleanType;
+      return t;
+    }
+    case NodeTypeEnum.List: {
+      t.listValue = value as ListType;
+      return t;
+    }
+    case NodeTypeEnum.Object: {
+      t.objectValue = value as ObjectType;
+      return t;
+    }
+    default: {
+      return t;
+    }
+  }
 };

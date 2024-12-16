@@ -818,49 +818,58 @@
 // const bloop2 = (v, c) => c
 // const h = bloop2(true, 500)
 
-fib :: (n::Number) => Number
+// fib :: (n::Number) => Number
 
-const fib = (n) => {
-    if (n <= 1) {
-        return n
-    } else {
-        return fib(n - 1) + fib(n - 2)
-    }
+// const fib = (n) => {
+//     if (n <= 1) {
+//         return n
+//     } else {
+//         return fib(n - 1) + fib(n - 2)
+//     }
 
-    return 0
-}
+//     return 0
+// }
 
 // const fib5 = fib(10)
 // print(fib5)
 
-Matrix :: [[Number]]
-const nums = 1..10
-const matrix :: Matrix = [[100, 100, 100], nums + [...nums]]
+// Matrix :: [[Number]]
+// const nums = 1..10
+// const matrix :: Matrix = [[100, 100, 100], nums + [...nums]]
 
-createMatrix :: (n::Number, m::Number) => Matrix
-const createMatrix = (n, m = 5) => [n] * m
+// createMatrix :: (n::Number, m::Number) => Matrix
+// const createMatrix = (n, m = 5) => [n] * m
 
-Person :: {
-    name: String,
-    age: Number,
-    matrix: Matrix,
-    address: {
-        street: String
-    }
-}
+// Person :: {
+//     name: String,
+//     age: Number,
+//     matrix: Matrix,
+//     address: {
+//         street: String
+//     }
+// }
 
-createPerson :: (name::String, age::Number) => Person
-const createPerson = (name, age) => {
-    return {
-        name, 
-        age, 
-        matrix: createMatrix(fib(10)), 
-        address: {
-            street: "123 Fake Street"
-    }}
-}
+// createPerson :: (name::String, age::Number) => Person
+// const createPerson = (name, age) => {
+//     return {
+//         name, 
+//         age,
+//         matrix: createMatrix(fib(10)), 
+//         address: {
+//             street: "123 Fake Street"
+//     }}
+// }
 
-var p :: Person = createPerson("Jason", 45)
-p = createPerson("Jack", 33)
+// var p :: Person = createPerson("Jason", 45)
+// p = createPerson("Jack", 33)
 
-print(p)
+// print(p)
+
+// proxy :: (object :: T is Object, handler :: Object) => T
+// const prox :: String = proxy(p, {})
+
+objToList :: (obj :: T && Object) => [{id: T, nums: [Number]}]
+const objToList = (obj) => [{id: obj, nums: 1..10}]
+
+var x = objToList({a: 100})
+print(x)

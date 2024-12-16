@@ -365,6 +365,7 @@ export type Node = {
   isGeneric?: boolean;
   concreteType?: Node;
   rawType?: Node;
+  extention?: Node;
 };
 
 export type NodePayload = {

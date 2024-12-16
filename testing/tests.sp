@@ -889,6 +889,5 @@
 
 // const g :: String = blah(10, (val) => val)
 // print(g)
-
-const x :: Number = 56
-var g :: String = x
+add :: (a::Number, b::Number) => Number
+var g :: [Number] = add(5, 6)

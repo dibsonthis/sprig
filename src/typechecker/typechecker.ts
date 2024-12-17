@@ -292,8 +292,9 @@ export class TypeChecker {
       }
 
       if (fnParam.type === NodeTypeEnum.Function) {
-        fn.functionValue.implementation = arg.functionValue.implementation;
-        // fn.funcNode.paramTypes[index].funcNode.implementation = fnParam;
+        // fn.functionValue.implementation = arg.functionValue.implementation;
+        fn.functionValue.paramTypes[index].functionValue.implementation =
+          arg.functionValue.value;
         // fn.funcNode.paramTypes[index].funcNode.implementation.funcNode.body =
         //   arg.funcNode.body;
       }
@@ -387,8 +388,8 @@ export class TypeChecker {
           // tc.typeMap[paramName] = tc.resolveType(paramType.value);
           // tc.typeMap[paramName].type.funcNode.implementation = value;
           // tc.typeMap[paramName].functionValue.implementation = value.value;
-          tc.typeMap[paramName].functionValue.implementation =
-            value.functionValue.implementation;
+          // tc.typeMap[paramName].functionValue.implementation =
+          //   value.functionValue.implementation;
         } else {
           tc.typeMap[paramName] = value;
         }
@@ -420,11 +421,14 @@ export class TypeChecker {
       }
     });
 
-    const expectedReturnType = func.functionValue.returnType;
+    var expectedReturnType = func.functionValue.returnType;
 
     tc.run();
 
     if (expectedReturnType) {
+      if (expectedReturnType.isGeneric) {
+        expectedReturnType = tc.resolveType(func.functionValue.value.right);
+      }
       const check = this.checkTypes(expectedReturnType, tc.returnType);
       if (!check) {
         this.errorAndExit(

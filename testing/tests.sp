@@ -892,9 +892,10 @@
 
 /* Types */
 
-// add :: (a::Number, b::Number) => Number
-// const add = (a, b) => a + b
-// var g :: [Number] = add(5, 6)
+add :: (a::Number, b::Number) => Number
+const add = (a, b) => a + b
+var g = add(5, 6)
+var z :: String = g
 
 // id :: (v::T) => ({id: T})
 // const id = (v) => ({id: v})
@@ -933,14 +934,20 @@
 
 // print(p)
 
-Vec3 :: (value :: T) => ({
-    x: T, y: T, z: T
-})
+// Vec3 :: (value :: T) => ({
+//     x: T, y: T, z: T
+// })
 
-const Vec3 = (value) => ({
-    x: value, y: value * 2, z: value / 3.4
-})
+// const Vec3 = (value) => ({
+//     x: value, y: value * 2, z: value / 3.4
+// })
 
-const z :: Vec3(Number) = Vec3(10)
+// const z :: Vec3(String) = Vec3("10")
 
-print(z)
+// print(z)
+
+// blah :: (v :: T, fn :: (val :: T) => K) => K
+// const blah = (v, fn) => fn(v)
+
+// const g :: String = blah(10, (val) => val)
+// print(g)

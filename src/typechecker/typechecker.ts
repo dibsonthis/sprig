@@ -953,11 +953,15 @@ export class TypeChecker {
           node.declNode.value.rawType = node.declNode.id;
         }
         var valueType = this.resolveValueType(node.declNode.value);
-        const left = node.declNode.id;
+        var left = node.declNode.id;
         var type: Type;
 
         if (valueType.type === NodeTypeEnum.Function) {
-          type = this.resolveType(left);
+          if (this.isTypeNode(left)) {
+            type = this.resolveType(left.right);
+          } else {
+            type = this.resolveType(left);
+          }
           // If the type is not defined, add it
           if (type.type === NodeTypeEnum.Generic) {
             type = valueType;
@@ -1083,6 +1087,9 @@ export class TypeChecker {
         var fnType: Type;
         var returnType = newType(NodeTypeEnum.Any);
         if (node.rawType) {
+          if (this.isTypeNode(node.rawType)) {
+            node.rawType = node.rawType.right;
+          }
           fnType = this.resolveType(node.rawType);
           if (fnType.type === NodeTypeEnum.Function) {
             returnType = fnType.functionValue.returnType;

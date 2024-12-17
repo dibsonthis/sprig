@@ -889,5 +889,58 @@
 
 // const g :: String = blah(10, (val) => val)
 // print(g)
-add :: (a::Number, b::Number) => Number
-var g :: [Number] = add(5, 6)
+
+/* Types */
+
+// add :: (a::Number, b::Number) => Number
+// const add = (a, b) => a + b
+// var g :: [Number] = add(5, 6)
+
+// id :: (v::T) => ({id: T})
+// const id = (v) => ({id: v})
+
+// var g :: {id: String} = id("10")
+// var h :: {id: Number} = id(10)
+// println(g, h)
+
+// length :: (v) => Number
+
+// listLength :: (v::[T]) => Number
+// const listLength = (v) => length(v)
+
+// var g = listLength(1..10)
+
+// proxy :: (object :: T && Object, handler :: { get: Object, set: Object }) => T
+
+// const obj = {name: "Jack", age: 34, address: {
+//     street: "123 Fake Street",
+//     postcode: 1234,
+//     nums: 1..10
+// }}
+
+// const handler = {
+//     get: {
+//         name: (v) => [v]
+//     }, 
+//     set: {
+//         name: (o, k, v, c) => {
+//             return v
+//         }
+//     }
+// }
+
+// const p :: String = proxy(obj, handler)
+
+// print(p)
+
+Vec3 :: (value :: T) => ({
+    x: T, y: T, z: T
+})
+
+const Vec3 = (value) => ({
+    x: value, y: value * 2, z: value / 3.4
+})
+
+const z :: Vec3(Number) = Vec3(10)
+
+print(z)

@@ -162,32 +162,15 @@ export class TypeChecker {
     return res;
   }
 
-  private getListType(node: Node) {
-    if (node.node) {
-      return node.node;
-    }
-    return node.nodes?.[0] ?? newType(NodeTypeEnum.Any);
-  }
-
   private getAbsoluteValueOfType(type: Type, value: Type) {
     var typeRes = type;
     var valueRes = value;
     while (typeRes.type === NodeTypeEnum.List) {
-      // typeRes = this.getListType(typeRes);
-      // valueRes = this.getListType(valueRes);
       typeRes = typeRes.listValue.value;
       valueRes = valueRes.listValue.value;
     }
     return { typeRes, valueRes };
   }
-
-  // private getAbsoluteType(node: Node) {
-  //   var res = node;
-  //   while (res.type === NodeTypeEnum.List) {
-  //     res = this.getListType(res);
-  //   }
-  //   return res;
-  // }
 
   private joinTypes(left: Type, right: Type) {
     const newList = newType(NodeTypeEnum.TypeList);
@@ -218,40 +201,43 @@ export class TypeChecker {
     return newList;
   }
 
-  // private mergeFunctionTypes(left: Node, right: Node) {
-  //   if (left.type !== NodeTypeEnum.Function) {
-  //     return newType(NodeTypeEnum.Error);
+  // private typeToNode = (type: Type): Node => {
+  //   switch (type.type) {
+  //     case NodeTypeEnum.String: {
+  //       return this.newNode(type.type, type.stringValue?.value);
+  //     }
+  //     case NodeTypeEnum.Number: {
+  //       return this.newNode(type.type, type.numberValue?.value);
+  //     }
+  //     case NodeTypeEnum.Boolean: {
+  //       return this.newNode(type.type, type.booleanValue?.value);
+  //     }
+  //     case NodeTypeEnum.List: {
+  //       const list = this.newNode(type.type);
+  //       list.nodes = [this.typeToNode(type.listValue.value)];
+  //       return list;
+  //     }
+  //     case NodeTypeEnum.Object: {
+  //       return this.newNode(type.type, type.objectValue?.value);
+  //     }
+  //     case NodeTypeEnum.TypeList: {
+  //       const list = this.newNode(type.type);
+  //       list.nodes = type.typeListValue.values.map((e) => this.typeToNode(e));
+  //       return list;
+  //     }
+  //     case NodeTypeEnum.Generic: {
+  //       t.genericValue = (value as GenericType) ?? {};
+  //       return t;
+  //     }
+  //     case NodeTypeEnum.Function: {
+  //       t.functionValue = (value as FunctionType) ?? {};
+  //       return t;
+  //     }
+  //     default: {
+  //       return t;
+  //     }
   //   }
-  //   if (right.type !== NodeTypeEnum.Function) {
-  //     return newType(NodeTypeEnum.Error);
-  //   }
-  //   if (left.funcNode.paramTypes.length !== left.funcNode.paramTypes.length) {
-  //     this.errorAndExit(
-  //       `Function type ${this.typeRepr(
-  //         left
-  //       )} is incompatible with type ${this.typeRepr(right)}`
-  //     );
-  //     return newType(NodeTypeEnum.Error);
-  //   }
-  //   const newFunction = newType(NodeTypeEnum.Function);
-  //   newFunction.funcNode = {
-  //     params: [],
-  //     paramTypes: [],
-  //     body: newType(),
-  //   };
-  //   left.funcNode.paramTypes.forEach((leftParam, index) => {
-  //     const rightParam = right.funcNode.paramTypes[index];
-  //     const joinedParam = this.joinTypes(leftParam, rightParam);
-  //     newFunction.funcNode.paramTypes.push(joinedParam);
-  //     newFunction.funcNode.params.push(joinedParam);
-  //   });
-
-  //   newFunction.funcNode.body = this.joinTypes(
-  //     left.funcNode.body,
-  //     right.funcNode.body
-  //   );
-  //   return newFunction;
-  // }
+  // };
 
   private matchArgsWithFunctionType(args: Type[], fn: Type) {
     if (fn.type !== NodeTypeEnum.Function) {
@@ -383,9 +369,10 @@ export class TypeChecker {
       return func.functionValue.returnType;
     }
 
-    var fnBody = func.functionValue.implementation
-      ? func.functionValue.implementation.funcNode.body
-      : this.newNode(func.functionValue.returnType.type);
+    var fnBody =
+      func.functionValue.implementation && asValueType
+        ? func.functionValue.implementation.right
+        : func.functionValue.value.right;
 
     const tc = new TypeChecker([fnBody], this.filePath);
 
@@ -438,13 +425,11 @@ export class TypeChecker {
     tc.run();
 
     if (expectedReturnType) {
-      // const evaluatedExpectedReturnType = tc.resolveType(expectedReturnType);
-      const evaluatedExpectedReturnType = expectedReturnType;
-      const check = this.checkTypes(evaluatedExpectedReturnType, tc.returnType);
+      const check = this.checkTypes(expectedReturnType, tc.returnType);
       if (!check) {
         this.errorAndExit(
           `TypeError: Defined return type is ${this.typeRepr(
-            evaluatedExpectedReturnType
+            expectedReturnType
           )} but function returns ${this.typeRepr(tc.returnType)}`
         );
       }
@@ -642,7 +627,7 @@ export class TypeChecker {
         if (this.closureTypeMap.hasOwnProperty(node.value)) {
           return this.closureTypeMap[node.value];
         }
-        const generic = newType(NodeTypeEnum.Generic, node.value);
+        const generic = newType(NodeTypeEnum.Generic, { value: node.value });
         generic.isGeneric = true;
         return generic;
       }
@@ -878,27 +863,40 @@ export class TypeChecker {
           Object.entries(node.value as Record<string, Node>).forEach(
             ([key, value]) => {
               typeObject.objectValue.value[key] = this.resolveType(value);
+              if (typeObject.objectValue.value[key].isGeneric) {
+                typeObject.isGeneric = true;
+              }
             }
           );
           return typeObject;
         }
-        const typeObject = newType(NodeTypeEnum.Object, {});
+        const typeObject = newType(NodeTypeEnum.Object, { value: {} });
         // typeObject.evaluated = true;
         if (node.node?.type === NodeTypeEnum.ID) {
           const propName = node.node;
           typeObject.objectValue.value[propName.value] =
             this.resolveType(propName);
+          if (typeObject.objectValue.value[propName.value].isGeneric) {
+            typeObject.isGeneric = true;
+          }
         } else if (
           node.node?.type === NodeTypeEnum.Operator &&
           node.node?.value === ":"
         ) {
           var propNode = node.node.left;
-          var propName: Type;
+          var propName: Type = newType(NodeTypeEnum.Generic, {
+            value: propNode.value,
+          });
           if (propNode.type === NodeTypeEnum.List) {
             propName = this.resolveType(propNode.node);
           }
           typeObject.objectValue.value[propName.genericValue.value] =
             this.resolveType(node.node.right);
+          if (
+            typeObject.objectValue.value[propName.genericValue.value].isGeneric
+          ) {
+            typeObject.isGeneric = true;
+          }
         } else if (
           node.node?.type === NodeTypeEnum.Operator &&
           node.node?.value === ","
@@ -917,6 +915,9 @@ export class TypeChecker {
               typeObject.objectValue.value[propName.value] = this.resolveType(
                 prop.right
               );
+              if (typeObject.objectValue.value[propName.value].isGeneric) {
+                typeObject.isGeneric = true;
+              }
             }
           });
         }
@@ -957,7 +958,7 @@ export class TypeChecker {
           if (type.type === NodeTypeEnum.Generic) {
             type = valueType;
           } else {
-            type.functionValue = {};
+            // type.functionValue = {};
             type.functionValue.implementation = node.declNode.value;
             // type.functionValue.implementation.funcNode.body =
             //   node.declNode.value.right;
@@ -1577,11 +1578,17 @@ export class TypeChecker {
         if (node.node) {
           const elem = this.resolveValueType(node.node);
           list.listValue = { value: elem };
+          if (elem.isGeneric) {
+            list.isGeneric = true;
+          }
           return list;
         }
         const types = this.removeDuplicateTypes(
           node.nodes?.map((e) => {
             const elem = this.resolveValueType(e);
+            if (elem.isGeneric) {
+              list.isGeneric = true;
+            }
             return elem;
           })
         );
@@ -1684,22 +1691,28 @@ export class TypeChecker {
         return typeList;
       }
       case NodeTypeEnum.Object: {
-        const typeObject = newType(NodeTypeEnum.Object, {});
+        const typeObject = newType(NodeTypeEnum.Object, { value: {} });
         if (node.node?.type === NodeTypeEnum.ID) {
           const propName = node.node;
           typeObject.objectValue.value[propName.value] =
             this.resolveValueType(propName);
+          typeObject.isGeneric =
+            typeObject.objectValue.value[propName.value].isGeneric;
         } else if (
           node.node?.type === NodeTypeEnum.Operator &&
           node.node?.value === ":"
         ) {
           var propNode = node.node.left;
-          var propName: Type;
+          var propName: Type = newType(NodeTypeEnum.Generic, {
+            value: propNode.value,
+          });
           if (propNode.type === NodeTypeEnum.List) {
             propName = this.resolveValueType(propNode.node);
           }
           typeObject.objectValue.value[propName.genericValue.value] =
             this.resolveValueType(node.node.right);
+          typeObject.isGeneric =
+            typeObject.objectValue.value[propName.genericValue.value].isGeneric;
         } else if (
           node.node?.type === NodeTypeEnum.Operator &&
           node.node?.value === ","
@@ -1717,6 +1730,9 @@ export class TypeChecker {
               }
               typeObject.objectValue.value[propName.value] =
                 this.resolveValueType(prop.right);
+              if (typeObject.objectValue.value[propName.value].isGeneric) {
+                typeObject.isGeneric = true;
+              }
             }
           });
         }
@@ -1756,6 +1772,13 @@ export class TypeChecker {
       valueType.type === NodeTypeEnum.Generic
     ) {
       return type.genericValue.value === valueType.genericValue.value;
+    }
+
+    if (type.isGeneric && valueType.isGeneric) {
+      const absolutes = this.getAbsoluteValueOfType(type, valueType);
+      if (absolutes.typeRes.type !== absolutes.valueRes.type) {
+        return false;
+      }
     }
 
     if (type.type === NodeTypeEnum.Generic) {
@@ -2025,24 +2048,6 @@ export class TypeChecker {
       this.returnType = newType(NodeTypeEnum.Error);
       return -1;
     }
-    // if (this.expectedReturnType) {
-    //   const evaluatedExpectedReturnType = this.resolveType(
-    //     this.expectedReturnType
-    //   );
-    //   const check = this.checkTypes(
-    //     evaluatedExpectedReturnType,
-    //     this.returnType
-    //   );
-    //   if (!check) {
-    //     this.errorAndExit(
-    //       `TypeError: Defined return type is ${this.typeRepr(
-    //         evaluatedExpectedReturnType
-    //       )} but function returns ${this.typeRepr(this.returnType)}`,
-    //       this.returnType
-    //     );
-
-    //   }
-    // }
     return this.typeMap;
   }
 }

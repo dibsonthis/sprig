@@ -934,24 +934,51 @@
 
 // print(p)
 
-Vec3 :: (value :: T) => ({
-    x: T, y: T, z: T
-})
+// Vec3 :: (value :: T) => ({
+//     x: T, y: T, z: T
+// })
 
-const Vec3 = (value) => ({
-    x: value, y: value * 2, z: value / 3.4
-})
+// const Vec3 = (value) => ({
+//     x: value, y: value * 2, z: value / 3.4
+// })
 
-const vec3 :: Vec3 = (value) => ({
-    x: value, y: value * 2, z: value / 3.4
-})
+// const vec3 :: Vec3 = (value) => ({
+//     x: value, y: value * 2, z: value / 3.4
+// })
 
-const z :: Vec3(Number) = Vec3(20)
+// const z :: Vec3(Number) = Vec3(20)
 
-print(z)
+// print(z)
 
 // blah :: (v :: T, fn :: (val :: T) => K) => K
 // const blah = (v, fn) => fn(v)
 
 // const g :: String = blah(10, (val) => val)
 // print(g)
+
+append :: (list :: [T], value :: T) => [T]
+map :: (list :: [T], fn :: (val :: T, index :: Number) => K) => [K]
+
+const map = (arr, fn) => {
+    var res :: [Number] = []
+    // for (arr, value, index) {
+    //     append(res, fn(value, index))
+    // }
+    return res
+}
+
+const g :: String = map([1, 2], (v, i) => ({id: v}))
+print(g)
+
+
+// blah :: (x::Number) => Number
+// const blah = (someValue) => someValue
+// const blah2 :: blah = (val) => val
+// const g :: String = blah2(8)
+
+// const f = () => {
+//     var g :: [Number] = []
+//     return g
+// }
+
+// const g :: String = f()

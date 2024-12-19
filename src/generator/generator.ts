@@ -592,6 +592,13 @@ export class Generator {
         const variableIndices = [];
         let variableIndex = 0;
         let isClass = false;
+        // Removing any existing typing
+        if (
+          node.declNode.id.type === NodeTypeEnum.Operator &&
+          node.declNode.id.value === "::"
+        ) {
+          node.declNode.id = node.declNode.id.left;
+        }
         if (node.declNode.id.type === NodeTypeEnum.Paren) {
           isClass = true;
           node.declNode.id = node.declNode.id.node;

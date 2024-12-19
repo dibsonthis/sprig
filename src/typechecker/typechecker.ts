@@ -70,7 +70,12 @@ export class TypeChecker {
         }
         repr += "(";
         repr += type.functionValue.paramTypes
-          .map((e) => this.typeRepr(e))
+          .map((e, i) => {
+            if (type.functionValue.paramCatchAll[i]) {
+              return "..." + this.typeRepr(e);
+            }
+            return this.typeRepr(e);
+          })
           .join(", ");
         repr += ") => ";
         repr += this.typeRepr(type.functionValue.returnType);
@@ -221,8 +226,9 @@ export class TypeChecker {
       return true;
     }
 
-    const hasCatchAll =
-      fn.functionValue.paramTypes.at(-1)?.type === NodeTypeEnum.CatchAllParam;
+    // const hasCatchAll =
+    //   fn.functionValue.paramTypes.at(-1)?.type === NodeTypeEnum.CatchAllParam;
+    const hasCatchAll = fn.functionValue.paramCatchAll.length;
 
     var paramsLength = hasCatchAll
       ? fn.functionValue.paramTypes.length - 1
@@ -250,20 +256,22 @@ export class TypeChecker {
     for (const [index, arg] of args.entries()) {
       const paramName = fn.functionValue.paramNames[index];
       const fnParam = fn.functionValue.paramTypes[index];
+      const fnParamIsCatchAll = fn.functionValue.paramCatchAll[index];
 
       if (!fnParam) {
         return false;
       }
 
-      if (fnParam.type === NodeTypeEnum.CatchAllParam) {
-        for (let i = index; i < args.length; i++) {
-          const _arg = args[i];
-          if (!this.checkTypes(fnParam, _arg)) {
-            return false;
+      if (fnParam)
+        if (fnParamIsCatchAll) {
+          for (let i = index; i < args.length; i++) {
+            const _arg = args[i];
+            if (!this.checkTypes(fnParam, _arg)) {
+              return false;
+            }
           }
+          return true;
         }
-        return true;
-      }
 
       if (!this.checkTypes(fnParam, arg)) {
         return false;

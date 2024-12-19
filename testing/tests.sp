@@ -959,18 +959,28 @@
 // const g :: String = blah(10, (val) => val)
 // print(g)
 
-// append :: (list :: [T], value :: T) => [T]
+/* Builtins */
+append :: (list :: [T], value :: T) => [T]
+insert :: (list :: [T], value :: T, index :: Number) => [T]
+length :: (value) => Number
+print :: (...args) => Undefined
+println :: (...args) => Undefined
+exec :: (expr :: String) => Any
+eval :: (expr :: String) => Any
+raw :: (expr) => Raw
+loadLib :: (filePath :: String) => Object
+
 // map :: (list :: [T], fn :: (val :: T, index :: Number) => K) => [K]
 
 // const map = (arr, fn) => {
-//     var res :: [fn(arr[0], 1)] = []
+//     var res :: [fn(arr[Number], Number)] = []
 //     for (arr, value, index) {
 //         append(res, fn(value, index))
 //     }
 //     return res
 // }
 
-// const g = map(1..10, (v, i) => ({id: [v]}))
+// const g :: String = print(insert(1..10, length(map(1..10, (v, i) => ({id: [v]}))), 0))
 // print(g)
 
 
@@ -979,6 +989,6 @@
 // const blah2 :: blah = (val) => val
 // const g :: String = blah2(8)
 
-const blah = () => 100
+// const blah = (x = "hi") => 100
 
-const f :: String = blah()
+// const f :: String = blah

@@ -61,7 +61,7 @@ export class TypeChecker {
         break;
       }
       case NodeTypeEnum.Function: {
-        if (!type.functionValue) {
+        if (!type.functionValue || !Object.keys(type.functionValue).length) {
           repr += "Function";
           break;
         }
@@ -156,7 +156,11 @@ export class TypeChecker {
       }
       const generic = current.type === NodeTypeEnum.Generic;
       var exists =
-        !generic && acc.some((item) => this.checkTypes(item, current));
+        !generic &&
+        acc.some(
+          (item) =>
+            item.type !== NodeTypeEnum.Generic && this.checkTypes(item, current)
+        );
       if (
         generic &&
         acc.some(
@@ -228,7 +232,7 @@ export class TypeChecker {
 
     // const hasCatchAll =
     //   fn.functionValue.paramTypes.at(-1)?.type === NodeTypeEnum.CatchAllParam;
-    const hasCatchAll = fn.functionValue.paramCatchAll.length;
+    const hasCatchAll = fn.functionValue.paramCatchAll.some((e) => e);
 
     var paramsLength = hasCatchAll
       ? fn.functionValue.paramTypes.length - 1
@@ -411,6 +415,13 @@ export class TypeChecker {
 
     var expectedReturnType = func.functionValue.returnType;
 
+    // If a function doesn't have an implementation, it doesn't need to run
+    // We can just use the tc context to resolve the expected return type, and return that
+
+    if (!func.functionValue.implementation) {
+      return tc.resolveType(func.functionValue.value.right);
+    }
+
     tc.run();
 
     if (expectedReturnType) {
@@ -475,6 +486,9 @@ export class TypeChecker {
         if (node.value === "Error") {
           return newType(NodeTypeEnum.Error);
         }
+        if (node.value === "Native") {
+          return newType(NodeTypeEnum.Native);
+        }
         if (node.value === "Undefined") {
           return newType();
         }
@@ -504,7 +518,13 @@ export class TypeChecker {
         }
         const typeList = newType(NodeTypeEnum.TypeList);
         typeList.typeListValue.values = this.removeDuplicateTypes(
-          node.nodes.map((elem) => this.resolveType(elem))
+          node.nodes.map((elem) => {
+            const resolvedElem = this.resolveType(elem);
+            if (resolvedElem.isGeneric) {
+              typeList.isGeneric = true;
+            }
+            return resolvedElem;
+          })
         );
         return typeList;
       }
@@ -671,7 +691,13 @@ export class TypeChecker {
           var types = this.flattenChildren(node, ["|"]) as Node[];
           const typeOptionsList = newType(NodeTypeEnum.TypeList);
           typeOptionsList.typeListValue.values = this.removeDuplicateTypes(
-            types.map((e) => this.resolveType(e))
+            types.map((e) => {
+              const resolvedElem = this.resolveType(e);
+              if (resolvedElem.isGeneric) {
+                typeOptionsList.isGeneric = true;
+              }
+              return resolvedElem;
+            })
           );
           return typeOptionsList;
         }
@@ -905,6 +931,9 @@ export class TypeChecker {
         }
         if (node.value === "Error") {
           return newType(NodeTypeEnum.Error);
+        }
+        if (node.value === "Native") {
+          return newType(NodeTypeEnum.Native);
         }
         if (node.value === "Undefined") {
           return newType();
@@ -1722,10 +1751,13 @@ export class TypeChecker {
       type.type === NodeTypeEnum.Function &&
       valueType.type === NodeTypeEnum.Function
     ) {
-      if (!type.functionValue) {
+      if (!type.functionValue || !Object.keys(type.functionValue).length) {
         return true;
       }
-      if (!valueType.functionValue) {
+      if (
+        !valueType.functionValue ||
+        !Object.keys(valueType.functionValue).length
+      ) {
         return true;
       }
       if (

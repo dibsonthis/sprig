@@ -968,7 +968,34 @@ println :: (...args) => Undefined
 exec :: (expr :: String) => Any
 eval :: (expr :: String) => Any
 raw :: (expr) => Raw
+value :: (value :: Raw) => Object
 loadLib :: (filePath :: String) => Object
+error :: (message :: String) => Object
+exit :: (code :: Number) => Undefined
+dis :: (fn :: Function) => Undefined
+inspect :: (value) => Object // TODO: type this correctly
+break :: (num :: Number) => Undefined
+out :: (value :: T) => T
+type :: (value) => String
+class :: (value) => Native | Function | Undefined
+closures :: () => Object
+globals :: () => Object
+locals :: () => Object
+keys :: (value :: Object) => [String]
+delete :: (object :: Object, key :: String) => Object // TODO: return typed object minus the key
+pop :: (list :: [T]) => T | Undefined
+popf :: (list :: [T]) => T | Undefined
+remove :: (list :: [T], index :: Number) => [T]
+proxy :: (object :: T && Object, handler :: Object) => T // TODO: type handler correctly, and possibly the returned object based on the handler's types
+__builtins :: () => Object // TODO: type this correctly
+__frame :: (n :: Number) => ({
+    line: Number,
+    col: Number,
+    filePath: String,
+    name: String,
+    vmPath: String,
+    locals: Object
+})
 
 // map :: (list :: [T], fn :: (val :: T, index :: Number) => K) => [K]
 
@@ -980,7 +1007,7 @@ loadLib :: (filePath :: String) => Object
 //     return res
 // }
 
-// const g :: String = print(insert(1..10, length(map(1..10, (v, i) => ({id: [v]}))), 0))
+// const g :: String = map(1..10, (v, i) => ({id: [v]}))
 // print(g)
 
 

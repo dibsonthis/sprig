@@ -286,7 +286,6 @@ export class Generator {
                 elem.type = NodeTypeEnum.String;
               }
               if (elem.type === NodeTypeEnum.Paren) {
-                // const fnCall = this.newNode(NodeTypeEnum.FunctionCall);
                 const fnCall = this.newNode(NodeTypeEnum.MethodCall);
                 fnCall.right = elem;
                 elem = fnCall;

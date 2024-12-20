@@ -306,7 +306,16 @@ export class TypeChecker {
     var func: Type = resolve(node.left);
 
     if (func.type === NodeTypeEnum.Any) {
-      return func;
+      func = newType(NodeTypeEnum.Function);
+      func.functionValue = {
+        paramCatchAll: [true],
+        paramNames: ["_"],
+        paramDefaultTypes: [],
+        paramOptionality: [],
+        paramTypes: [newType(NodeTypeEnum.Any)],
+        returnType: newType(NodeTypeEnum.Any),
+      };
+      // return func;
     }
 
     const rawArgs: Node[] = this.flattenChildren(node.right.node, [","]);
@@ -1105,6 +1114,51 @@ export class TypeChecker {
       }
       case NodeTypeEnum.Operator: {
         let left: Type;
+
+        if (node.value === ".") {
+          const flattened: Node[] = this.flattenChildren(node, [
+            ".",
+            NodeTypeEnum[NodeTypeEnum.Accessor],
+            NodeTypeEnum[NodeTypeEnum.FunctionCall],
+          ]);
+          var toAccess = this.resolveValueType(flattened[0]);
+          flattened.forEach((elem: Node, index) => {
+            if (index > 0) {
+              if (elem.type === NodeTypeEnum.List) {
+                elem = elem.node;
+              }
+              if (
+                toAccess.type === NodeTypeEnum.Object &&
+                (elem.type === NodeTypeEnum.String ||
+                  elem.type === NodeTypeEnum.ID)
+              ) {
+                toAccess = toAccess.objectValue.value[elem.value] ?? newType();
+              }
+
+              if (
+                toAccess.type === NodeTypeEnum.List &&
+                elem.type === NodeTypeEnum.Number
+              ) {
+                toAccess = toAccess.listValue.value;
+              } else if (
+                toAccess.type === NodeTypeEnum.String &&
+                elem.type === NodeTypeEnum.Number
+              ) {
+                toAccess = newType(NodeTypeEnum.String);
+              } else if (
+                toAccess.type === NodeTypeEnum.Function &&
+                elem.type === NodeTypeEnum.Paren
+              ) {
+                const fnCallNode = this.newNode(NodeTypeEnum.FunctionCall);
+                fnCallNode.left = toAccess.functionValue.value;
+                fnCallNode.right = elem;
+                toAccess = this.resolveValueType(fnCallNode);
+              }
+            }
+          });
+          return toAccess;
+        }
+
         if (!node.meta?.unary) {
           left = this.resolveValueType(node.left);
         }
@@ -1140,13 +1194,6 @@ export class TypeChecker {
           }
           return typeList;
         }
-
-        // if (
-        //   left.type === NodeTypeEnum.Generic ||
-        //   right.type === NodeTypeEnum.Generic
-        // ) {
-        //   return newType(NodeTypeEnum.Undefined);
-        // }
 
         if (node.value === "=") {
           if (node.left.type === NodeTypeEnum.ID) {
@@ -1507,8 +1554,6 @@ export class TypeChecker {
           toAccess.type === NodeTypeEnum.List &&
           accessor.type === NodeTypeEnum.List
         ) {
-          // const listType = this.getListType(toAccess);
-          // const accessorType = this.getListType(accessor);
           const listType = toAccess.listValue.value;
           const accessorType = accessor.listValue.value;
           if (
@@ -1520,7 +1565,37 @@ export class TypeChecker {
           }
           return listType;
         }
-        // todo: objects
+        if (
+          toAccess.type === NodeTypeEnum.Object &&
+          accessor.type === NodeTypeEnum.List
+        ) {
+          const accessorType = accessor.listValue.value;
+          if (
+            accessorType.type !== NodeTypeEnum.String &&
+            accessorType.type !== NodeTypeEnum.Any
+          ) {
+            this.errorAndExit("Object accessor must be a string");
+            return newType(NodeTypeEnum.Error);
+          }
+
+          const propName = accessorType.stringValue.value;
+          return toAccess.objectValue.value[propName] ?? newType();
+        }
+
+        if (
+          toAccess.type === NodeTypeEnum.String &&
+          accessor.type === NodeTypeEnum.List
+        ) {
+          const accessorType = accessor.listValue.value;
+          if (
+            accessorType.type !== NodeTypeEnum.Number &&
+            accessorType.type !== NodeTypeEnum.Any
+          ) {
+            this.errorAndExit("String accessor must be a number");
+            return newType(NodeTypeEnum.Error);
+          }
+          return newType(NodeTypeEnum.String);
+        }
         return newType(NodeTypeEnum.Any);
       }
       case NodeTypeEnum.ForStatement: {

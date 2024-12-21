@@ -1064,7 +1064,7 @@
 // popf :: (list :: [T]) => T | Undefined
 
 // const map = (arr :: [T], fn :: (val :: T, index :: Number) => K) => {
-//     var res :: [fn(arr[Number], Number)] = []
+//     var res :: [Normalize(fn(arr[Number], Number))] = []
 //     for (arr, value, index) {
 //         append(res, fn(value, index))
 //     }
@@ -1074,18 +1074,33 @@
 // const g :: [String] = map(1..10, (v, i) => ({id: popf([v, "hi"])}))
 // print(g)
 
-// keys :: (value :: Object) => [String]
-// const blah = (obj :: Object) => keys(obj)
+// keys :: (value :: T && Object) => [Keys(T)]
 
-// const g :: [String] = blah({a: 1, b: 2})
-// print(g)
+// const person = {
+//     name: "Jack",
+//     age: 34,
+//     id: 10001
+// }
 
-const something = (x::Number) => {
-    if (x < 10) {
-        return "yes"
-    }
+// const blah :: Keys(person) = "age"
+// const vals :: Values(person) = person.id
 
-    return "no"
-}
+// const name = "id"
 
-const g :: String = something(10)
+// const pet = {
+//     [name]: "Pickles",
+//     age: 3
+// }
+
+// const g :: Values(pet) = "Pickless"
+
+// const x :: Record(String) = {a: "1", b: "true"}
+// const y :: Record(Normalize(Values({a: 1, b: false}))) = {b: 344, a: true}
+
+length :: (value) => Number
+const blah = (x :: T && Object, y :: Keys(T), z :: Normalize(Values(T))) :: Normalize(T) => x
+const g :: String = blah({a: 1, b: 2}, "a", 4)
+print(g)
+
+// const blah = (x :: T) :: Normalize(T) => "100"
+// blah("hi")

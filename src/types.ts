@@ -392,6 +392,7 @@ export type TypeListType = {
 
 export type ObjectType = {
   value: Record<string, Type>;
+  record?: Type;
 };
 
 export type RawType = {
@@ -418,9 +419,14 @@ export type FunctionType = {
   paramCatchAll?: boolean[];
   returnType?: Type;
   isGeneric?: boolean;
+  inlineReturnNode?: Node;
   implementation?: Node;
   value?: Node;
   closures?: Record<string, Type>;
+};
+
+export type FunctionCallType = {
+  node?: Node;
 };
 
 export type Type = {
@@ -435,6 +441,7 @@ export type Type = {
   typeListValue?: TypeListType;
   rawValue?: RawType;
   genericValue?: GenericType;
+  functionCall?: FunctionCallType;
   /* meta */
   typeAlias?: string;
   isGeneric?: boolean;
@@ -453,6 +460,7 @@ export const newType = (
     | RawType
     | ErrorType
     | GenericType
+    | FunctionCallType
 ) => {
   const t: Type = { type: type ?? NodeTypeEnum.Undefined };
   switch (type) {
@@ -490,6 +498,10 @@ export const newType = (
     }
     case NodeTypeEnum.Function: {
       t.functionValue = (value as FunctionType) ?? {};
+      return t;
+    }
+    case NodeTypeEnum.FunctionCall: {
+      t.functionCall = (value as FunctionCallType) ?? {};
       return t;
     }
     default: {

@@ -183,11 +183,15 @@ export class TypeChecker {
   private getAbsoluteValueOfType(type: Type, value: Type) {
     var typeRes = type;
     var valueRes = value;
-    while (typeRes.type === NodeTypeEnum.List) {
+    while (
+      typeRes.type === NodeTypeEnum.List &&
+      valueRes.type === NodeTypeEnum.List
+    ) {
       typeRes = typeRes.listValue.value;
-      if (valueRes.type === NodeTypeEnum.List) {
-        valueRes = valueRes.listValue.value;
-      }
+      valueRes = valueRes.listValue.value;
+      // if (valueRes.type === NodeTypeEnum.List) {
+      //   valueRes = valueRes.listValue.value;
+      // }
     }
     return { typeRes, valueRes };
   }
@@ -1150,7 +1154,10 @@ export class TypeChecker {
                 elem.type === NodeTypeEnum.Paren
               ) {
                 const fnCallNode = this.newNode(NodeTypeEnum.FunctionCall);
-                fnCallNode.left = toAccess.functionValue.value;
+                fnCallNode.left =
+                  toAccess.functionValue.implementation ??
+                  toAccess.functionValue.value;
+                fnCallNode.left.rawType = toAccess.functionValue.value;
                 fnCallNode.right = elem;
                 toAccess = this.resolveValueType(fnCallNode);
               }
@@ -1735,27 +1742,16 @@ export class TypeChecker {
       return true;
     }
 
-    /* Commenting this out because T can be K */
-
-    // if (
-    //   type.type === NodeTypeEnum.Generic &&
-    //   valueType.type === NodeTypeEnum.Generic
-    // ) {
-    //   return type.genericValue.value === valueType.genericValue.value;
-    // }
-
     if (type.isGeneric && valueType.isGeneric) {
       const absolutes = this.getAbsoluteValueOfType(type, valueType);
       /* T can be List or Object types */
-      if (
-        absolutes.typeRes.type === NodeTypeEnum.Generic ||
-        absolutes.valueRes.type === NodeTypeEnum.Generic
-      ) {
+      if (absolutes.typeRes.type === NodeTypeEnum.Generic) {
         return true;
       }
       if (absolutes.typeRes.type !== absolutes.valueRes.type) {
         return false;
       }
+      return true;
     }
 
     if (type.type === NodeTypeEnum.Generic) {
@@ -1795,21 +1791,6 @@ export class TypeChecker {
       // If we've reached here, then the value has more options than the type
       return false;
     }
-
-    // if (type.type === NodeTypeEnum.FunctionCall && type.isType) {
-    //   const fnName = type.left.value;
-    //   const arg = this.resolveType(type.right);
-
-    //   if (fnName === "Not") {
-    //     if (this.checkTypes(arg, valueType)) {
-    //       return false;
-    //     }
-
-    //     return true;
-    //   }
-
-    //   return true;
-    // }
 
     if (
       type.type === NodeTypeEnum.List &&
@@ -1887,6 +1868,11 @@ export class TypeChecker {
         const check = this.checkTypes(prop, valueProp);
         if (!check) {
           passedPropCheck = false;
+        } else if (
+          prop.type === NodeTypeEnum.Function &&
+          valueProp.type === NodeTypeEnum.Function
+        ) {
+          prop.functionValue.implementation = valueProp.functionValue.value;
         }
       });
 

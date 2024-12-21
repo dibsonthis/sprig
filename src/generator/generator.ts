@@ -914,7 +914,7 @@ export class Generator {
       case NodeTypeEnum.Object: {
         const props = this.flattenChildren(node.node, [","]).reverse();
         props.forEach((e: Node) => {
-          if (e.left.type === NodeTypeEnum.Operator && e.left.value === "::") {
+          if (e.left?.type === NodeTypeEnum.Operator && e.left.value === "::") {
             e.left = e.left.left;
           }
           if (e.type === NodeTypeEnum.ID) {
@@ -966,6 +966,9 @@ export class Generator {
         var isCatchAll = false;
 
         params.forEach((param, index) => {
+          if (param.type === NodeTypeEnum.Operator && param.value === "::") {
+            param = param.left;
+          }
           if (param.type === NodeTypeEnum.Operator && param.value === "=") {
             if (isCatchAll) {
               this.errorAndExit(

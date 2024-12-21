@@ -420,6 +420,7 @@ export type FunctionType = {
   isGeneric?: boolean;
   implementation?: Node;
   value?: Node;
+  closures?: Record<string, Type>;
 };
 
 export type Type = {

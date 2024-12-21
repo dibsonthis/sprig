@@ -318,8 +318,8 @@ export class TypeChecker {
         paramOptionality: [],
         paramTypes: [newType(NodeTypeEnum.Any)],
         returnType: newType(NodeTypeEnum.Any),
+        closures: {},
       };
-      // return func;
     }
 
     const rawArgs: Node[] = this.flattenChildren(node.right.node, [","]);
@@ -377,6 +377,11 @@ export class TypeChecker {
     tc.typeMap = { ...this.typeMap };
     this.genericNamesToClear.forEach((key) => {
       delete tc.typeMap[key];
+    });
+
+    // We add any closures here
+    Object.entries(func.functionValue.closures ?? {}).forEach(([k, v]) => {
+      tc.typeMap[k] = v;
     });
 
     // We get the real function here, so that we can change the param names
@@ -592,6 +597,7 @@ export class TypeChecker {
           paramNames: [],
           returnType: newType(),
           name: node.meta?.name,
+          closures: {},
         };
         funcNode.functionValue.value = node;
         // funcNode.evaluated = true;
@@ -1005,6 +1011,7 @@ export class TypeChecker {
           paramDefaultTypes: [],
           returnType: newType(),
           name: node.meta?.name,
+          closures: {},
         };
         funcNode.functionValue.value = node;
         // funcNode.evaluated = true;
@@ -1105,7 +1112,7 @@ export class TypeChecker {
         }
 
         funcNode.functionValue.returnType = tc.returnType;
-        // funcNode.funcNode.returnType = returnType;
+        funcNode.functionValue.implementation = node;
 
         return funcNode;
       }
@@ -1126,6 +1133,7 @@ export class TypeChecker {
             NodeTypeEnum[NodeTypeEnum.FunctionCall],
           ]);
           var toAccess = this.resolveValueType(flattened[0]);
+          const typedSections = [toAccess];
           flattened.forEach((elem: Node, index) => {
             if (index > 0) {
               if (elem.type === NodeTypeEnum.List) {
@@ -1159,8 +1167,14 @@ export class TypeChecker {
                   toAccess.functionValue.value;
                 fnCallNode.left.rawType = toAccess.functionValue.value;
                 fnCallNode.right = elem;
+                // We set "this" to the prev type
+                const prevThis = this.typeMap["this"];
+                this.typeMap["this"] = typedSections[index - 2];
                 toAccess = this.resolveValueType(fnCallNode);
+                this.typeMap["this"] = prevThis;
               }
+
+              typedSections.push(toAccess);
             }
           });
           return toAccess;
@@ -1667,6 +1681,11 @@ export class TypeChecker {
       }
       case NodeTypeEnum.Object: {
         const typeObject = newType(NodeTypeEnum.Object, { value: {} });
+
+        // we update "this" variable
+        const prevThis = this.typeMap["this"];
+        this.typeMap["this"] = typeObject;
+
         if (node.node?.type === NodeTypeEnum.ID) {
           const propName = node.node;
           typeObject.objectValue.value[propName.value] =
@@ -1695,6 +1714,9 @@ export class TypeChecker {
             node.node.right.rawType = rawExpectedType;
           }
           const propValue = this.resolveValueType(node.node.right);
+          if (propValue.type === NodeTypeEnum.Function) {
+            propValue.functionValue.closures["this"] = this.typeMap["this"];
+          }
           if (expectedType) {
             if (!this.checkTypes(expectedType, propValue)) {
               this.errorAndExit(
@@ -1739,6 +1761,9 @@ export class TypeChecker {
                 prop.right.rawType = rawExpectedType;
               }
               const propValue = this.resolveValueType(prop.right);
+              if (propValue.type === NodeTypeEnum.Function) {
+                propValue.functionValue.closures["this"] = this.typeMap["this"];
+              }
               if (expectedType) {
                 if (!this.checkTypes(expectedType, propValue)) {
                   this.errorAndExit(
@@ -1761,6 +1786,7 @@ export class TypeChecker {
             }
           });
         }
+        this.typeMap["this"] = prevThis;
         return typeObject;
       }
       default: {

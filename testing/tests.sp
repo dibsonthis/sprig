@@ -997,6 +997,8 @@
 //     locals: Object
 // })
 
+// append :: (list :: [T], value :: T) => [T]
+// popf :: (list :: [T]) => T | Undefined
 // map :: (list :: [T], fn :: (val :: T, index :: Number) => K) => [K]
 
 // const map = (arr, fn) => {
@@ -1007,7 +1009,7 @@
 //     return res
 // }
 
-// const g :: [String] = map(1..10, (v, i) => ({id: popf([v])}))
+// const g :: [String] = map(1..10, (v, i) => ({id: popf([v, "hi"])}))
 // print(g)
 
 
@@ -1044,10 +1046,30 @@
 // Fn :: (x :: Number) => [Number]
 // const Fn = (x) => x
 
-const p = {
-    age: 45,
-    fn :: (x :: Number) => [Number]: (x) => [x]
+// const createPerson = (name :: String, age :: Number) => {
+//     return {
+//         name,
+//         age,
+//         getName: () => this.name,
+//         getAge: () => this.age,
+//         bloop: (x :: T) => x
+//     }
+// }
+
+// const n :: [String] = createPerson("jack", 56)
+// print(n)
+
+
+append :: (list :: [T], value :: T) => [T]
+popf :: (list :: [T]) => T | Undefined
+
+const map = (arr :: [T], fn :: (val :: T, index :: Number) => K) => {
+    var res :: [fn(arr[Number], Number)] = []
+    for (arr, value, index) {
+        append(res, fn(value, index))
+    }
+    return res
 }
 
-const g :: p = p
-const n :: String = p.fn(1)
+const g :: [String] = map(1..10, (v, i) => ({id: popf([v, "hi"])}))
+print(g)

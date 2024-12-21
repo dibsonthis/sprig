@@ -913,7 +913,10 @@ export class Generator {
       }
       case NodeTypeEnum.Object: {
         const props = this.flattenChildren(node.node, [","]).reverse();
-        props.forEach((e) => {
+        props.forEach((e: Node) => {
+          if (e.left.type === NodeTypeEnum.Operator && e.left.value === "::") {
+            e.left = e.left.left;
+          }
           if (e.type === NodeTypeEnum.ID) {
             e.left = this.newNode(NodeTypeEnum.String, e.value);
             e.right = this.newNode(NodeTypeEnum.ID, e.value);

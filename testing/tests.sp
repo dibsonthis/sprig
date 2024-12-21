@@ -960,7 +960,7 @@
 // print(g)
 
 // /* Builtins */
-append :: (list :: [T], value :: T) => [T]
+// append :: (list :: [T], value :: T) => [T]
 // insert :: (list :: [T], value :: T, index :: Number) => [T]
 // length :: (value) => Number
 // print :: (...args) => Undefined
@@ -984,7 +984,7 @@ append :: (list :: [T], value :: T) => [T]
 // keys :: (value :: Object) => [String]
 // delete :: (object :: Object, key :: String) => Object // TODO: return typed object minus the key
 // pop :: (list :: [T]) => T | Undefined
-popf :: (list :: [T]) => T | Undefined
+// popf :: (list :: [T]) => T | Undefined
 // remove :: (list :: [T], index :: Number) => [T]
 // proxy :: (object :: T && Object, handler :: Object) => T // TODO: type handler correctly, and possibly the returned object based on the handler's types
 // __builtins :: () => Object // TODO: type this correctly
@@ -997,18 +997,18 @@ popf :: (list :: [T]) => T | Undefined
 //     locals: Object
 // })
 
-map :: (list :: [T], fn :: (val :: T, index :: Number) => K) => [K]
+// map :: (list :: [T], fn :: (val :: T, index :: Number) => K) => [K]
 
-const map = (arr, fn) => {
-    var res :: [fn(arr[Number], Number)] = []
-    for (arr, value, index) {
-        append(res, fn(value, index))
-    }
-    return res
-}
+// const map = (arr, fn) => {
+//     var res :: [fn(arr[Number], Number)] = []
+//     for (arr, value, index) {
+//         append(res, fn(value, index))
+//     }
+//     return res
+// }
 
-const g :: [String] = map(1..10, (v, i) => ({id: popf([v])}))
-print(g)
+// const g :: [String] = map(1..10, (v, i) => ({id: popf([v])}))
+// print(g)
 
 
 // blah :: (x::Number) => Number
@@ -1040,3 +1040,14 @@ print(g)
 // }}
 
 // const g :: Number = person.address.fn(1..10)
+
+// Fn :: (x :: Number) => [Number]
+// const Fn = (x) => x
+
+const p = {
+    age: 45,
+    fn :: (x :: Number) => [Number]: (x) => [x]
+}
+
+const g :: p = p
+const n :: String = p.fn(1)

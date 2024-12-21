@@ -1678,14 +1678,36 @@ export class TypeChecker {
           node.node?.value === ":"
         ) {
           var propNode = node.node.left;
+          var expectedType: Type;
+          var rawExpectedType: Node;
+          if (this.isTypeNode(propNode)) {
+            rawExpectedType = propNode.right;
+            expectedType = this.resolveType(propNode.right);
+            propNode = propNode.left;
+          }
           var propName: Type = newType(NodeTypeEnum.Generic, {
             value: propNode.value,
           });
           if (propNode.type === NodeTypeEnum.List) {
             propName = this.resolveValueType(propNode.node);
           }
+          if (expectedType?.type === NodeTypeEnum.Function) {
+            node.node.right.rawType = rawExpectedType;
+          }
+          const propValue = this.resolveValueType(node.node.right);
+          if (expectedType) {
+            if (!this.checkTypes(expectedType, propValue)) {
+              this.errorAndExit(
+                `TypeError: Property '${
+                  propName.genericValue.value
+                }' is of type ${this.typeRepr(
+                  expectedType
+                )} but received value of type ${this.typeRepr(propValue)}`
+              );
+            }
+          }
           typeObject.objectValue.value[propName.genericValue.value] =
-            this.resolveValueType(node.node.right);
+            expectedType ?? propValue;
           typeObject.isGeneric =
             typeObject.objectValue.value[propName.genericValue.value].isGeneric;
         } else if (
@@ -1693,19 +1715,47 @@ export class TypeChecker {
           node.node?.value === ","
         ) {
           const props = this.flattenChildren(node.node, [","]);
-          props.forEach((prop) => {
+          props.forEach((prop: Node) => {
             if (prop.type === NodeTypeEnum.ID) {
               const propName = prop;
               typeObject.objectValue.value[propName.value] =
                 this.resolveValueType(propName);
             } else {
-              var propName = prop.left;
-              if (propName.type === NodeTypeEnum.List) {
-                propName = this.resolveValueType(propName.node);
+              var propNode: Node = prop.left;
+              var expectedType: Type;
+              var rawExpectedType: Node;
+              if (this.isTypeNode(propNode)) {
+                rawExpectedType = propNode.right;
+                expectedType = this.resolveType(propNode.right);
+                propNode = propNode.left;
               }
-              typeObject.objectValue.value[propName.value] =
-                this.resolveValueType(prop.right);
-              if (typeObject.objectValue.value[propName.value].isGeneric) {
+              var propName: Type = newType(NodeTypeEnum.Generic, {
+                value: propNode.value,
+              });
+              if (propNode.type === NodeTypeEnum.List) {
+                propName = this.resolveValueType(propNode.node);
+              }
+              if (expectedType?.type === NodeTypeEnum.Function) {
+                prop.right.rawType = rawExpectedType;
+              }
+              const propValue = this.resolveValueType(prop.right);
+              if (expectedType) {
+                if (!this.checkTypes(expectedType, propValue)) {
+                  this.errorAndExit(
+                    `TypeError: Property '${
+                      propName.genericValue.value
+                    }' is of type ${this.typeRepr(
+                      expectedType
+                    )} but received value of type ${this.typeRepr(propValue)}`
+                  );
+                }
+              }
+              typeObject.objectValue.value[propName.genericValue.value] =
+                expectedType ?? propValue;
+              if (
+                typeObject.objectValue.value[propName.genericValue.value]
+                  .isGeneric
+              ) {
                 typeObject.isGeneric = true;
               }
             }

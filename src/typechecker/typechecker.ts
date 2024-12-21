@@ -44,9 +44,6 @@ export class TypeChecker {
         }
         return type.genericValue.value;
       }
-      // case NodeTypeEnum.CatchAllParam: {
-      //   return `...${this.typeRepr(node.value)}`;
-      // }
       case NodeTypeEnum.TypeList: {
         repr += type.typeListValue.values
           ?.map((elem) => this.typeRepr(elem))
@@ -81,12 +78,6 @@ export class TypeChecker {
         repr += this.typeRepr(type.functionValue.returnType);
         break;
       }
-      // case NodeTypeEnum.FunctionCall: {
-      //   const fnName = node.left.value;
-      //   const arg = this.resolveType(node.right);
-      //   repr += fnName + `(${this.typeRepr(arg)})`;
-      //   break;
-      // }
       case NodeTypeEnum.Object: {
         if (!type.objectValue) {
           repr += "Object";
@@ -113,6 +104,24 @@ export class TypeChecker {
         }
         repr += " }";
         return repr;
+      }
+      case NodeTypeEnum.String: {
+        if (type.stringValue?.value) {
+          if (type.stringValue.value !== "String") {
+            repr += '"' + type.stringValue.value + '"';
+            break;
+          }
+        }
+        repr += "String";
+        break;
+      }
+      case NodeTypeEnum.Number: {
+        if (type.numberValue?.value) {
+          repr += type.numberValue.value;
+          break;
+        }
+        repr += "Number";
+        break;
       }
       default: {
         repr += NodeTypeEnum[type.type];
@@ -261,7 +270,7 @@ export class TypeChecker {
       ? this.resolveValueType(fn.functionValue.implementation)
       : fn;
 
-    for (const [index, arg] of args.entries()) {
+    for (var [index, arg] of args.entries()) {
       const paramName = fn.functionValue.paramNames[index];
       const fnParam = fn.functionValue.paramTypes[index];
       const fnParamIsCatchAll = fn.functionValue.paramCatchAll[index];
@@ -286,11 +295,8 @@ export class TypeChecker {
       }
 
       if (fnParam.type === NodeTypeEnum.Function) {
-        // fn.functionValue.implementation = arg.functionValue.implementation;
         fn.functionValue.paramTypes[index].functionValue.implementation =
           arg.functionValue.value;
-        // fn.funcNode.paramTypes[index].funcNode.implementation.funcNode.body =
-        //   arg.funcNode.body;
       }
 
       if (paramName !== realFunction.functionValue.paramNames[index]) {
@@ -510,9 +516,12 @@ export class TypeChecker {
         if (node.value === "Undefined") {
           return newType();
         }
-        const stringType = newType(NodeTypeEnum.String, {
-          value: node.value as string,
-        });
+        const stringType = newType(NodeTypeEnum.String);
+        if (node.value !== "String") {
+          stringType.stringValue = {
+            value: node.value as string,
+          };
+        }
         return stringType;
       }
       case NodeTypeEnum.Number: {
@@ -957,9 +966,12 @@ export class TypeChecker {
         if (node.value === "Undefined") {
           return newType();
         }
-        const stringType = newType(NodeTypeEnum.String, {
-          value: node.value as string,
-        });
+        const stringType = newType(NodeTypeEnum.String);
+        if (node.value !== "String") {
+          stringType.stringValue = {
+            value: node.value as string,
+          };
+        }
         return stringType;
       }
       case NodeTypeEnum.Number: {
@@ -1838,6 +1850,14 @@ export class TypeChecker {
       return true;
     }
 
+    if (valueType.type === NodeTypeEnum.Generic) {
+      // We check for any extensions
+      if (valueType.genericValue.extention) {
+        return this.checkTypes(type, valueType.genericValue.extention);
+      }
+      return true;
+    }
+
     if (
       type.type === NodeTypeEnum.TypeList &&
       valueType.type === NodeTypeEnum.TypeList
@@ -1864,6 +1884,20 @@ export class TypeChecker {
     }
 
     if (valueType.type === NodeTypeEnum.TypeList) {
+      // Since we're allowing literals for numbers and strings only
+      // We check to see if it's a number or a string type
+      // Then re-run the typecheck
+      if (
+        type.type === NodeTypeEnum.Number ||
+        type.type === NodeTypeEnum.String
+      ) {
+        for (const _type of valueType.typeListValue.values) {
+          if (!this.checkTypes(type, _type)) {
+            return false;
+          }
+        }
+        return true;
+      }
       // If we've reached here, then the value has more options than the type
       return false;
     }
@@ -1956,6 +1990,26 @@ export class TypeChecker {
     }
 
     if (type.type === valueType.type) {
+      switch (type.type) {
+        case NodeTypeEnum.Number: {
+          if (
+            type.numberValue?.value &&
+            type.numberValue?.value !== valueType.numberValue?.value
+          ) {
+            return false;
+          }
+          break;
+        }
+        case NodeTypeEnum.String: {
+          if (
+            type.stringValue?.value &&
+            type.stringValue?.value !== valueType.stringValue?.value
+          ) {
+            return false;
+          }
+          break;
+        }
+      }
       return true;
     }
 

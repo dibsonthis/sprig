@@ -1060,16 +1060,32 @@
 // print(n)
 
 
-append :: (list :: [T], value :: T) => [T]
-popf :: (list :: [T]) => T | Undefined
+// append :: (list :: [T], value :: T) => [T]
+// popf :: (list :: [T]) => T | Undefined
 
-const map = (arr :: [T], fn :: (val :: T, index :: Number) => K) => {
-    var res :: [fn(arr[Number], Number)] = []
-    for (arr, value, index) {
-        append(res, fn(value, index))
+// const map = (arr :: [T], fn :: (val :: T, index :: Number) => K) => {
+//     var res :: [fn(arr[Number], Number)] = []
+//     for (arr, value, index) {
+//         append(res, fn(value, index))
+//     }
+//     return res
+// }
+
+// const g :: [String] = map(1..10, (v, i) => ({id: popf([v, "hi"])}))
+// print(g)
+
+// keys :: (value :: Object) => [String]
+// const blah = (obj :: Object) => keys(obj)
+
+// const g :: [String] = blah({a: 1, b: 2})
+// print(g)
+
+const something = (x::Number) => {
+    if (x < 10) {
+        return "yes"
     }
-    return res
+
+    return "no"
 }
 
-const g :: [String] = map(1..10, (v, i) => ({id: popf([v, "hi"])}))
-print(g)
+const g :: String = something(10)

@@ -1060,10 +1060,10 @@
 // print(n)
 
 
-// append :: (list :: [T], value :: T) => [T]
-// popf :: (list :: [T]) => T | Undefined
+// append :: ((list :: [T], value :: T) => [T])
+// popf :: ((list :: [T]) => T | Undefined)
 
-// const map = (arr :: [T], fn :: (val :: T, index :: Number) => K) => {
+// const map = (arr :: [T], fn :: ((val :: T, index :: Number) => K)) => {
 //     var res :: [Normalize(fn(arr[Number], Number))] = []
 //     for (arr, value, index) {
 //         append(res, fn(value, index))
@@ -1097,10 +1097,45 @@
 // const x :: Record(String) = {a: "1", b: "true"}
 // const y :: Record(Normalize(Values({a: 1, b: false}))) = {b: 344, a: true}
 
-length :: (value) => Number
-const blah = (x :: T && Object, y :: Keys(T), z :: Normalize(Values(T))) :: Normalize(T) => x
-const g :: String = blah({a: 1, b: 2}, "a", 4)
-print(g)
+// length :: ((value) => Number)
+// const blah = (x :: T && Record(Number), y :: Keys(T), z :: Normalize(Values(T))) :: Normalize(T) => x
+// const g = blah({a: 1, b: 2, c: 3}, "a", 4)
 
-// const blah = (x :: T) :: Normalize(T) => "100"
-// blah("hi")
+// const obj = {
+//     blah,
+//     g
+// }
+
+// const n :: String = obj.g
+
+// print(n)
+
+proxy :: ((
+    object :: T && Object, 
+    handler :: {
+        get: Record((v) => Any) | Undefined, 
+        set: Record((o, k, v, c) => Any) | Undefined,
+        repr: Record((v) => Any) | Undefined
+    }
+) => Object)
+
+const obj = {a: 1, b: true, c: "hello"}
+
+const getHandler = (v :: Values(obj)) :: Normalize([v]) => [v]
+
+ProxyType :: {
+    a: getHandler(obj["a"]),
+    b: getHandler(obj["b"]),
+    c: getHandler(obj["c"])
+}
+
+const p :: ProxyType = proxy(obj, {
+    get: {
+        _: getHandler
+    },
+    set: undefined,
+    repr: undefined
+})
+
+const b :: [String] = p.c
+print(b)

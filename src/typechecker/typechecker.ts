@@ -498,6 +498,8 @@ export class TypeChecker {
           )} but function returns ${this.typeRepr(tc.returnType)}`
         );
       }
+
+      return expectedReturnType;
     }
 
     return tc.returnType;
@@ -820,7 +822,37 @@ export class TypeChecker {
           }
           return listType;
         }
-        // todo: objects
+        if (
+          toAccess.type === NodeTypeEnum.Object &&
+          accessor.type === NodeTypeEnum.List
+        ) {
+          const accessorType = accessor.listValue.value;
+          if (
+            accessorType.type !== NodeTypeEnum.String &&
+            accessorType.type !== NodeTypeEnum.Any
+          ) {
+            this.errorAndExit("Object accessor must be a string");
+            return newType(NodeTypeEnum.Error);
+          }
+
+          const propName = accessorType.stringValue.value;
+          return toAccess.objectValue.value[propName] ?? newType();
+        }
+
+        if (
+          toAccess.type === NodeTypeEnum.String &&
+          accessor.type === NodeTypeEnum.List
+        ) {
+          const accessorType = accessor.listValue.value;
+          if (
+            accessorType.type !== NodeTypeEnum.Number &&
+            accessorType.type !== NodeTypeEnum.Any
+          ) {
+            this.errorAndExit("String accessor must be a number");
+            return newType(NodeTypeEnum.Error);
+          }
+          return newType(NodeTypeEnum.String);
+        }
         return newType(NodeTypeEnum.Any);
       }
       case NodeTypeEnum.Operator: {

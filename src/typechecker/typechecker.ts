@@ -313,8 +313,13 @@ export class TypeChecker {
       }
 
       if (fnParam.type === NodeTypeEnum.Function) {
-        fn.functionValue.paramTypes[index].functionValue.implementation =
-          arg.functionValue.value;
+        if (
+          Object.keys(fn.functionValue.paramTypes[index].functionValue ?? {})
+            .length
+        ) {
+          fn.functionValue.paramTypes[index].functionValue.implementation =
+            arg.functionValue.value;
+        }
       }
 
       if (paramName !== realFunction.functionValue.paramNames[index]) {
@@ -1394,17 +1399,32 @@ export class TypeChecker {
             if (canChange) {
               this.typeMap[node.left.value] = valueType;
             } else {
-              if (!this.checkTypes(type, valueType)) {
-                this.errorAndExit(
-                  `TypeError: Expected type ${this.typeRepr(
-                    type
-                  )} but received type ${this.typeRepr(valueType)}`
-                );
-                return newType(NodeTypeEnum.Error);
-              }
+              this.errorAndExit(
+                `TypeError: Cannot assign value of type ${this.typeRepr(
+                  valueType
+                )} to variable of type ${this.typeRepr(type)}`
+              );
             }
             return valueType;
           }
+          const type = this.resolveValueType(node.left);
+          const valueType = this.resolveValueType(node.right);
+
+          // TODO: Either allow or disallow changes to objects
+          // Currently it's allowed, but no type info is retained, so not great
+
+          if (type.type === NodeTypeEnum.Undefined) {
+            return valueType;
+          }
+
+          if (!this.checkTypes(type, valueType)) {
+            this.errorAndExit(
+              `TypeError: Cannot assign value of type ${this.typeRepr(
+                valueType
+              )} to variable of type ${this.typeRepr(type)}`
+            );
+          }
+          return valueType;
         }
 
         if (node.value === "||") {

@@ -12,31 +12,37 @@
 //     getLocalTests
 // } = Test
 
-// const test_object = () => {
-//     const PI = 3.14
-//     const key = "id"
-//     const person = {
-//         token: "_-_",
-//         nums: (1...3),
-//         bloop: {
-//             a: 10 + 4,
-//             b: 20,
-//             c: (1...4),
-//             d: (const d = 1200) + (const e = 1.4)
-//         },
-//         [key]: PI
-//     }
+assert :: ((compFunction::Function, a, b) => Undefined)
+objectHas :: ((object :: Object, prop :: String) => Boolean)
+isEqual :: ((a, b) => Boolean)
 
-//     person.nums[0] = 100
-//     person.bloop.c[0] = person.token * person.bloop.a
-//     person.bloop.e = person.bloop.d + d
+const test_object = () => {
+    const PI = 3.14
+    const key = "id"
+    const person = {
+        token: "_-_",
+        nums: (1...3),
+        bloop: {
+            a: 10 + 4,
+            b: 20,
+            c :: [Number | String]: (1...4),
+            d: (const d = 1200) + (const e = 1.4)
+        },
+        [key]: PI
+    }
 
-//     assert(objectHas, person, "id")
-//     assert(isEqual, person.token, "_-_")
-//     assert(isEqual, person.id, 3.14)
-//     assert(isEqual, person.bloop.e, 2401.4)
-//     assert(isEqual, person.bloop.e, 2401.4)
-// }
+    person.nums[0] = 100
+    person.bloop.c[0] = person.token * person.bloop.a
+    person.bloop.e = person.bloop.d + d
+
+    assert(objectHas, person, "id")
+    assert(isEqual, person.token, "_-_")
+    assert(isEqual, person.id, 3.14)
+    assert(isEqual, person.bloop.e, 2401.4)
+    assert(isEqual, person.bloop.e, 2401.4)
+}
+
+const g :: String = test_object()
 
 // const test_coroutines = () => {
 //     const coro = () => {
@@ -1110,32 +1116,33 @@
 
 // print(n)
 
-proxy :: ((
-    object :: T && Object, 
-    handler :: {
-        get: Record((v) => Any) | Undefined, 
-        set: Record((o, k, v, c) => Any) | Undefined,
-        repr: Record((v) => Any) | Undefined
-    }
-) => Object)
+// proxy :: ((
+//     object :: T && Object, 
+//     handler :: {
+//         get: Record((v) => Any) | Undefined, 
+//         set: Record((o, k, v, c) => Any) | Undefined,
+//         repr: Record((v) => Any) | Undefined
+//     }
+// ) => Object)
 
-const obj = {a: 1, b: true, c: "hello"}
+// const obj = {a: 1, b: true, c: "hello"}
 
-const getHandler = (v :: Values(obj)) :: Normalize([v]) => [v]
+// const getHandler = (v :: Values(obj)) :: Normalize([v]) => [v]
 
-ProxyType :: {
-    a: getHandler(obj["a"]),
-    b: getHandler(obj["b"]),
-    c: getHandler(obj["c"])
-}
+// ProxyType :: {
+//     a: getHandler(obj["a"]),
+//     b: getHandler(obj["b"]),
+//     c: getHandler(obj["c"])
+// }
 
-const p :: ProxyType = proxy(obj, {
-    get: {
-        _: getHandler
-    },
-    set: undefined,
-    repr: undefined
-})
+// const p :: ProxyType = proxy(obj, {
+//     get: {
+//         _: getHandler
+//     },
+//     set: undefined,
+//     repr: undefined
+// })
 
-const b :: [String] = p.c
-print(b)
+// const b = p.c
+// const n :: String = b
+// print(b)

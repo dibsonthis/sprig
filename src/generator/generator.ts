@@ -7,8 +7,8 @@ export class Generator {
   private index: number = 0;
   public generatedNodes: Node[] = [];
 
-  public symbols: SymbolTable = {};
-  public tempVars: SymbolTable = {};
+  public symbols: SymbolTable = new Map();
+  public tempVars: SymbolTable = new Map();
   public cachedImports = {};
   public filePath: string;
 
@@ -16,7 +16,7 @@ export class Generator {
   public isCoroutine = false;
   public variables: { id: string; type: string }[] = [];
   public tempVariables: { id: string; type: string }[] = [];
-  public variableMap: Record<string, number> = {};
+  public variableMap: Map<string, number> = new Map();
   public hasError = false;
 
   private errorAndContinue(message: string, node?: Node) {
@@ -619,7 +619,7 @@ export class Generator {
             variableIndex = symbolIndex;
           } else {
             variableIndex = this.variables.length;
-            this.variableMap[node.declNode.id.value] = this.variables.length;
+            this.variableMap.set(node.declNode.id.value, this.variables.length);
             this.variables.push({
               id: node.declNode.id.value,
               type: node.value,
@@ -652,7 +652,7 @@ export class Generator {
                 return;
               }
             } else {
-              this.variableMap[elem.value] = this.variables.length;
+              this.variableMap.set(elem.value, this.variables.length);
               this.variables.push({ id: elem.value, type: node.value });
             }
             variableIndices.push(this.variables.length - 1);
@@ -689,7 +689,7 @@ export class Generator {
                 return;
               }
             } else {
-              this.variableMap[elem.value] = this.variables.length;
+              this.variableMap.set(elem.value, this.variables.length);
               this.variables.push({ id: elem.value, type: node.value });
             }
             variableIndices.push(this.variables.length - 1);
@@ -964,7 +964,7 @@ export class Generator {
             );
 
             const variableIndex = generator.variables.length;
-            generator.variableMap[param.left.value] = variableIndex;
+            generator.variableMap.set(param.left.value, variableIndex);
             generator.variables.push({ id: param.left.value, type: "let" });
 
             this.generateBytecode(param.right, false, captureIds);
@@ -990,7 +990,7 @@ export class Generator {
               this.generatedNodes.push(catchAllParam);
 
               const variableIndex = generator.variables.length;
-              generator.variableMap[param.right.value] = variableIndex;
+              generator.variableMap.set(param.right.value, variableIndex);
               generator.variables.push({ id: param.right.value, type: "let" });
             } else {
               if (isCatchAll) {
@@ -1004,7 +1004,7 @@ export class Generator {
               );
 
               const variableIndex = generator.variables.length;
-              generator.variableMap[param.value] = variableIndex;
+              generator.variableMap.set(param.value, variableIndex);
               generator.variables.push({ id: param.value, type: "let" });
             }
           }
@@ -1025,7 +1025,7 @@ export class Generator {
           params: undefined,
           body: undefined,
           originFilePath: this.filePath,
-          closures: {},
+          closures: new Map(),
           isCoroutine: generator.isCoroutine,
           variableMap: generator.variableMap,
         };

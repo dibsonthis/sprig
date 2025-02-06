@@ -3,8 +3,8 @@ const updateBuiltin = (name, fn) => {
         if (!_vm?.meta?.__originalFunctions) {
             _vm.meta.__originalFunctions = {}
         }
-        _vm.meta.__originalFunctions[name] = _vm?.builtins[name]
-        _vm.builtins[name] = (args) => _vm.jsToNode(fn(args.map((arg) => _vm.nodeToJS(arg))))
+        _vm.meta.__originalFunctions[name] = _vm?.builtins.get(name)
+        _vm.builtins.set(name, (args) => _vm.jsToNode(fn(args.map((arg) => _vm.nodeToJS(arg)))))
     }`)
 
     nativeFn(name, fn)
@@ -17,11 +17,11 @@ const resetBuiltin = (name) => {
         }
 
         if (!_vm?.meta?.__originalFunctions[name]) {
-            delete _vm.builtins[name]
+            delete _vm.builtins.get(name)
             return
         }
 
-        _vm.builtins[name] = _vm?.meta.__originalFunctions[name]
+        _vm.builtins.set(name, _vm?.meta.__originalFunctions[name])
     }`)
 
     nativeFn(name)
@@ -34,7 +34,7 @@ const resetBuiltins =  () => {
         }
 
         Object.entries(_vm?.meta?.__originalFunctions).forEach(([key, value]) => {
-            _vm.builtins[key] = value
+            _vm.builtins.set(key, value)
         })
     }`)
 
@@ -64,10 +64,10 @@ const removeOperator = (operator) => {
 const addVariable = (name, value) => {
     const nativeFn = exec(`(name, value) => {
         if (_vm.callFrame.parentFrame) {
-            _vm.callFrame.parentFrame.symbols[name] = {
+            _vm.callFrame.parentFrame.symbols.set(name, {
                 node: _vm.jsToNode(value),
                 const: false
-            }
+            })
         }
     }`)
 
@@ -77,7 +77,7 @@ const addVariable = (name, value) => {
 const removeVariable = (name) => {
     const nativeFn = exec(`(name) => {
         if (_vm.callFrame.parentFrame) {
-            delete _vm.callFrame.parentFrame?.symbols[name]
+            delete _vm.callFrame.parentFrame?.symbols.get(name)
         }
     }`)
 

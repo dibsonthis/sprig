@@ -244,12 +244,12 @@ export type CallFrame = {
   tempVarsArray: NodeArray;
   variables: { id: string; type: string }[];
   tempVariables: { id: string; type: string }[];
-  variableMap: Record<string, number>;
+  variableMap: Map<string, number>;
   tempVars: SymbolTable;
   coroutine?: Node;
 };
 
-export type SymbolTable = Record<
+export type SymbolTable = Map<
   string,
   {
     node: Node;
@@ -284,7 +284,7 @@ export type FuncNode = {
     isGlobal?: boolean;
     isClosure?: boolean;
   }[];
-  variableMap?: Record<string, number>;
+  variableMap?: Map<string, number>;
   meta?: {};
 };
 

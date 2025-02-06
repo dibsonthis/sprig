@@ -12,6 +12,8 @@ const {
     getLocalTests
 } = Test
 
+println(Test)
+
 const test_object = () => {
     const PI = 3.14
     const key = "id"

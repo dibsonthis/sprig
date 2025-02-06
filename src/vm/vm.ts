@@ -13,13 +13,13 @@ const newCallFrame = (instructions = []): CallFrame => {
     instructions,
     instruction: undefined,
     index: -1,
-    symbols: {},
+    symbols: new Map(),
     symbolsArray: [],
     tempVarsArray: [],
     variables: [],
     tempVariables: [],
-    variableMap: {},
-    tempVars: {},
+    variableMap: new Map(),
+    tempVars: new Map(),
     capturedIds: new Set<string>([]),
   };
 };
@@ -416,13 +416,13 @@ export class VM {
 
     const evalVM = new VM(generator.generatedNodes, this.filePath);
 
-    evalVM.builtins = {
+    evalVM.builtins = new Map([
       ...this.builtins,
-      __frame: evalVM.builtins.__frame,
-      __builtins: evalVM.builtins.__builtins,
-      exec: evalVM.builtins.exec,
-      break: evalVM.builtins.break,
-    };
+      ["__frame", evalVM.builtins.get("__frame")],
+      ["__builtins", evalVM.builtins.get("__builtins")],
+      ["exec", evalVM.builtins.get("exec")],
+      ["break", evalVM.builtins.get("break")],
+    ]);
 
     evalVM.callFrame.variables = generator.variables;
     evalVM.callFrame.tempVariables = generator.tempVariables;
@@ -432,35 +432,35 @@ export class VM {
       ...(this.callFrame.capturedIds ?? new Set<string>()),
       ...evalVM.callFrame.capturedIds,
     ]);
-    for (const key in this.callFrame.variableMap) {
-      const index = this.callFrame.variableMap[key];
+    for (const [key] of this.callFrame.variableMap) {
+      const index = this.callFrame.variableMap.get(key);
       const symbol = this.callFrame.symbolsArray[index];
-      evalVM.callFrame.symbols[key] = symbol;
+      evalVM.callFrame.symbols.set(key, symbol);
     }
 
     if (env) {
       for (const prop in env.value) {
-        evalVM.callFrame.symbols[prop] = {
+        evalVM.callFrame.symbols.set(prop, {
           node: env.value[prop],
           const: false,
-        };
+        });
       }
     } else {
-      evalVM.callFrame.symbols = {
+      evalVM.callFrame.symbols = new Map([
         ...this.callFrame.symbols,
         ...evalVM.callFrame.symbols,
-      };
-      evalVM.callFrame.tempVars = { ...this.callFrame.tempVars };
+      ]);
+      evalVM.callFrame.tempVars = new Map(this.callFrame.tempVars);
       evalVM.callFrame.symbolsArray = [...this.callFrame.symbolsArray];
       evalVM.callFrame.tempVarsArray = this.callFrame.tempVarsArray;
     }
 
     const res = evalVM.evaluate();
 
-    for (const key in evalVM.callFrame.variableMap) {
-      const index = evalVM.callFrame.variableMap[key];
+    for (const [key] of evalVM.callFrame.variableMap) {
+      const index = evalVM.callFrame.variableMap.get(key);
       const symbol = evalVM.callFrame.symbolsArray[index];
-      this.callFrame.symbols[key] = symbol;
+      this.callFrame.symbols.set(key, symbol);
     }
 
     return res;
@@ -500,23 +500,23 @@ export class VM {
     generator.capturedIds.forEach((id) => {
       const symbol = this.findSymbol_(id);
       if (symbol) {
-        evalFrame.symbols[id] = symbol;
+        evalFrame.symbols.set(id, symbol);
       } else {
         const closure = this.findClosure(id);
         if (closure) {
-          evalFrame.symbols[id] = closure;
+          evalFrame.symbols.set(id, closure);
         }
       }
     });
 
     this.callFrame.tempVarsArray.forEach((variable) => {
-      evalFrame.symbols[variable.id] = variable;
+      evalFrame.symbols.set(variable.id, variable);
     });
 
-    evalFrame.symbols = {
+    evalFrame.symbols = new Map([
       ...this.callFrame.symbols,
       ...evalFrame.symbols,
-    };
+    ]);
 
     evalFrame.tempVars = this.callFrame.tempVars;
     evalFrame.symbolsArray = this.callFrame.symbolsArray;
@@ -535,25 +535,25 @@ export class VM {
     }
     if (fn.type == NodeTypeEnum.Function) {
       const vm = new VM(fn.value, this.filePath);
-      vm.builtins = {
+      vm.builtins = new Map([
         ...this.builtins,
-        __frame: vm.builtins.__frame,
-        __builtins: vm.builtins.__builtins,
-        exec: vm.builtins.exec,
-        break: vm.builtins.break,
-      };
+        ["__frame", vm.builtins.get("__frame")],
+        ["__builtins", vm.builtins.get("__builtins")],
+        ["exec", vm.builtins.get("exec")],
+        ["break", vm.builtins.get("break")],
+      ]);
       args.forEach((arg) => {
         arg.evaluated = true;
         vm.callFrame.symbolsArray.push({ const: true, node: arg });
       });
-      Object.entries(fn.funcNode?.closures ?? {}).forEach(([k, v]) => {
-        vm.callFrame.symbols[k] = v;
+      fn.funcNode?.closures.forEach((v, k) => {
+        vm.callFrame.symbols.set(k, v);
       });
 
-      for (const key in this.callFrame.variableMap) {
-        const index = this.callFrame.variableMap[key];
+      for (const [key] of this.callFrame.variableMap) {
+        const index = this.callFrame.variableMap.get(key);
         const symbol = this.callFrame.symbolsArray[index];
-        vm.callFrame.symbols[key] = symbol;
+        vm.callFrame.symbols.set(key, symbol);
       }
 
       vm.callFrame.variableMap = fn.funcNode?.variableMap;
@@ -575,17 +575,17 @@ export class VM {
     return this.jsToNode(res);
   }
 
-  public builtins = {
+  public builtins_ = {
     __builtins: (args: Node[]) => {
       const builtinsObject = this.newNode(NodeTypeEnum.Object, {}, true);
-      Object.keys(this.builtins).forEach((key) => {
+      this.builtins.forEach((_, key) => {
         const nativeNode = this.newNode(NodeTypeEnum.Native);
         nativeNode.nativeNode = {
           name: key,
-          function: this.builtins[key],
+          function: this.builtins.get(key),
           builtin: true,
         };
-        builtinsObject.value[key] = nativeNode;
+        builtinsObject.value.set(key, nativeNode);
       });
       return builtinsObject;
     },
@@ -611,8 +611,8 @@ export class VM {
 
       const locals = this.newNode(NodeTypeEnum.Object, {}, true);
 
-      Object.keys(frame.variableMap).forEach((key) => {
-        const index = frame.variableMap[key];
+      frame.variableMap.forEach((_, key) => {
+        const index = frame.variableMap.get(key);
         const symbol = frame.symbolsArray[index];
         symbol && (locals.value[key] = symbol.node);
       });
@@ -933,24 +933,24 @@ export class VM {
     },
     closures: (args: Node[]) => {
       const symbolObject = this.newNode(NodeTypeEnum.Object, {}, true);
-      Object.keys(this.callFrame.symbols).forEach((key) => {
-        const symbol = this.callFrame.symbols[key];
+      this.callFrame.symbols.forEach((_, key) => {
+        const symbol = this.callFrame.symbols.get(key);
         !symbol?.isGlobal && (symbolObject.value[key] = symbol.node);
       });
       return symbolObject;
     },
     globals: (args: Node[]) => {
       const symbolObject = this.newNode(NodeTypeEnum.Object, {}, true);
-      Object.keys(this.callFrame.symbols).forEach((key) => {
-        const symbol = this.callFrame.symbols[key];
+      this.callFrame.symbols.forEach((_, key) => {
+        const symbol = this.callFrame.symbols.get(key);
         symbol?.isGlobal && (symbolObject.value[key] = symbol.node);
       });
       return symbolObject;
     },
     locals: (args: Node[]) => {
       const symbolObject = this.newNode(NodeTypeEnum.Object, {}, true);
-      Object.keys(this.callFrame.variableMap).forEach((key) => {
-        const index = this.callFrame.variableMap[key];
+      this.callFrame.variableMap.forEach((_, key) => {
+        const index = this.callFrame.variableMap.get(key);
         const symbol = this.callFrame.symbolsArray[index];
         symbol && (symbolObject.value[key] = symbol.node);
       });
@@ -1090,6 +1090,8 @@ export class VM {
       return objCopy;
     },
   };
+
+  public builtins = new Map(Object.entries(this.builtins_));
 
   private evaluateOperator(node: Node) {
     var right = this.callFrame.stack.pop();
@@ -1447,14 +1449,14 @@ export class VM {
       fnName = fn.value;
     }
 
-    if (fnName && this.builtins.hasOwnProperty(fnName)) {
-      return this.builtins[fnName](args);
+    if (fnName && this.builtins.has(fnName)) {
+      return this.builtins.get(fnName)(args);
     }
 
     fnName &&
       (fn =
         this.callFrame.symbolsArray[fn.index]?.node ??
-        this.callFrame.symbols[fnName]?.node);
+        this.callFrame.symbols.get(fnName)?.node);
 
     if (!fn) {
       this.errorAndContinue(`Function '${fnName}' is undefined`);
@@ -1487,7 +1489,7 @@ export class VM {
       frame.coroutine = fn;
       const newfn = { ...fn };
       const closures = newfn.funcNode.closures;
-      newfn.funcNode.closures = {};
+      newfn.funcNode.closures = new Map();
       fn = structuredClone(newfn);
       fn.funcNode.closures = closures;
       fn.funcNode.symbolsArray = [];
@@ -1508,8 +1510,8 @@ export class VM {
 
     if (fn.funcNode.coroutineIndex !== undefined) {
       frame.coroutine = fn;
-      for (const key in fn.funcNode.closures) {
-        frame.symbols[key] = fn.funcNode.closures[key];
+      for (const [key] of fn.funcNode.closures) {
+        frame.symbols.set(key, fn.funcNode.closures.get(key));
       }
 
       frame.symbolsArray = fn.funcNode.symbolsArray;
@@ -1517,17 +1519,13 @@ export class VM {
       frame.index = fn.funcNode.coroutineIndex - 1;
       frame.instruction = frame.instructions[frame.index];
     } else {
-      for (const key in fn.funcNode.closures) {
-        frame.symbols[key] = fn.funcNode.closures[key];
+      for (const [key] of fn.funcNode.closures) {
+        frame.symbols.set(key, fn.funcNode.closures.get(key));
       }
     }
 
-    // if (fnName && !frame.symbols[fnName]) {
-    //   frame.symbols[fnName] = { node: fn, const: false };
-    // }
-
-    if (fn.funcNode?.name && !frame.symbols[fn.funcNode?.name]) {
-      frame.symbols[fn.funcNode.name] = { node: fn, const: false };
+    if (fn.funcNode?.name && !frame.symbols.get(fn.funcNode?.name)) {
+      frame.symbols.set(fn.funcNode.name, { node: fn, const: false });
     }
 
     fn.funcNode.params.forEach((param, index) => {
@@ -1566,7 +1564,7 @@ export class VM {
     });
 
     for (const prop in namedArgs) {
-      const index = frame.variableMap[prop];
+      const index = frame.variableMap.get(prop);
       frame.symbolsArray[index] = {
         node: namedArgs[prop],
         const: false,
@@ -1578,7 +1576,7 @@ export class VM {
     if (fn.schema) {
       Object.keys(fn.schema.value).forEach((key) => {
         const schemaProp = fn.schema.value[key];
-        const index = frame.variableMap[key];
+        const index = frame.variableMap.get(key);
         const valueType = NodeTypeEnum[frame.symbolsArray[index].node.type];
 
         if (schemaProp.type === NodeTypeEnum.List && schemaProp.nodes) {
@@ -1667,10 +1665,10 @@ export class VM {
 
       if (value.type === NodeTypeEnum.Function) {
         value.funcNode.name = key.value;
-        value.funcNode.closures["this"] = {
+        value.funcNode.closures.set("this", {
           node: evaluatedObject,
           const: false,
-        };
+        });
       }
 
       evaluatedObject.value[key.value] = value;
@@ -1681,8 +1679,8 @@ export class VM {
   public findClosure(id: string) {
     let frame = this.callFrame;
     while (frame) {
-      if (frame.symbols.hasOwnProperty(id)) {
-        return frame.symbols[id];
+      if (frame.symbols.has(id)) {
+        return frame.symbols.get(id);
       }
       frame = frame.parentFrame;
     }
@@ -1693,8 +1691,8 @@ export class VM {
   public findSymbol_(id: string) {
     let frame = this.callFrame;
     while (frame) {
-      if (frame.variableMap.hasOwnProperty(id)) {
-        const index = frame.variableMap[id];
+      if (frame.variableMap.has(id)) {
+        const index = frame.variableMap.get(id);
         return frame.symbolsArray[index];
       }
       frame = frame.parentFrame;
@@ -1713,7 +1711,7 @@ export class VM {
       body: undefined,
       params: [],
       defaults: {},
-      closures: {},
+      closures: new Map(),
       isCoroutine: node.funcNode?.isCoroutine,
       originFilePath: node.funcNode?.originFilePath,
       variableMap: node.funcNode?.variableMap,
@@ -1738,20 +1736,20 @@ export class VM {
     fn.meta?.capturedIds?.forEach((id) => {
       const symbol = this.findSymbol_(id);
       if (symbol) {
-        fn.funcNode.closures[id] = symbol;
+        fn.funcNode.closures.set(id, symbol);
       } else {
         const closure = this.findClosure(id);
         if (closure) {
-          fn.funcNode.closures[id] = closure;
+          fn.funcNode.closures.set(id, closure);
         }
       }
     });
 
     // Inject globals
 
-    Object.entries(this.callFrame.symbols).forEach(([key, value]) => {
+    this.callFrame.symbols.forEach((value, key) => {
       if (value.isGlobal) {
-        fn.funcNode.closures[key] = value;
+        fn.funcNode.closures.set(key, value);
       }
     });
 
@@ -2043,13 +2041,15 @@ export class VM {
       generator.generate();
 
       const vm = new VM(generator.generatedNodes, generator.filePath);
-      vm.builtins = {
+
+      vm.builtins = new Map([
         ...this.builtins,
-        __frame: vm.builtins.__frame,
-        __builtins: vm.builtins.__builtins,
-        exec: vm.builtins.exec,
-        break: vm.builtins.break,
-      };
+        ["__frame", vm.builtins.get("__frame")],
+        ["__builtins", vm.builtins.get("__builtins")],
+        ["exec", vm.builtins.get("exec")],
+        ["break", vm.builtins.get("break")],
+      ]);
+
       vm.callFrame.variables = generator.variables;
       vm.callFrame.tempVariables = generator.tempVariables;
       vm.callFrame.variableMap = generator.variableMap;
@@ -2058,10 +2058,10 @@ export class VM {
       vm.parentVM = this;
       vm.injectBuiltins = this.injectBuiltins;
 
-      Object.keys(this.callFrame.symbols).forEach((k) => {
-        const symbol = this.callFrame.symbols[k];
+      this.callFrame.symbols.forEach((_, k) => {
+        const symbol = this.callFrame.symbols.get(k);
         if (symbol.isGlobal) {
-          vm.callFrame.symbols[k] = symbol;
+          vm.callFrame.symbols.set(k, symbol);
         }
       });
 
@@ -2081,34 +2081,34 @@ export class VM {
 
         const cachedObject = this.cachedImports[resolvedPath];
         if (cachedObject) {
-          this.callFrame.symbols[moduleName.value] = {
+          this.callFrame.symbols.set(moduleName.value, {
             node: cachedObject,
             const: false,
-          };
+          });
           return;
         }
 
         const moduleObject = this.newNode(NodeTypeEnum.Object, {});
         moduleObject.evaluated = true;
-        Object.keys(vm.callFrame.symbols).forEach((key) => {
-          const symbol = vm.callFrame.symbols[key];
+        vm.callFrame.symbols.forEach((_, key) => {
+          const symbol = vm.callFrame.symbols.get(key);
           moduleObject.value[key] = {
             ...symbol.node,
             meta: { hiddenProp: symbol.isGlobal },
           };
         });
-        Object.keys(vm.callFrame.variableMap).forEach((key) => {
-          const index = vm.callFrame.variableMap[key];
+        vm.callFrame.variableMap.forEach((_, key) => {
+          const index = vm.callFrame.variableMap.get(key);
           const symbol = vm.callFrame.symbolsArray[index];
           moduleObject.value[key] = {
             ...symbol.node,
             meta: { hiddenProp: symbol.isGlobal },
           };
         });
-        this.callFrame.symbols[moduleName.value] = {
+        this.callFrame.symbols.set(moduleName.value, {
           node: moduleObject,
           const: false,
-        };
+        });
 
         this.cachedImports[resolvedPath] = moduleObject;
 
@@ -2117,13 +2117,13 @@ export class VM {
 
       for (let i = 0; i < node.value; i++) {
         const name = this.callFrame.stack.pop();
-        if (vm.callFrame.variableMap[name.value] !== undefined) {
-          this.callFrame.symbols[name.value] = {
+        if (vm.callFrame.variableMap.get(name.value) !== undefined) {
+          this.callFrame.symbols.set(name.value, {
             node: vm.callFrame.symbolsArray[
-              vm.callFrame.variableMap[name.value]
+              vm.callFrame.variableMap.get(name.value)
             ].node,
             const: false,
-          };
+          });
         } else {
           this.errorAndContinue(
             `Variable '${name.value}' does not exist in '${resolvedPath}'`
@@ -2383,8 +2383,8 @@ export class VM {
         return right;
       }
 
-      if (this.callFrame.symbols.hasOwnProperty(left.value)) {
-        this.callFrame.symbols[left.value].node = right;
+      if (this.callFrame.symbols.has(left.value)) {
+        this.callFrame.symbols.get(left.value).node = right;
         return right;
       }
 
@@ -2575,14 +2575,14 @@ export class VM {
     },
     [NodeTypeEnum.LoadSymbol]: (node: Node) => {
       const name = node.value;
-      if (this.callFrame.symbols.hasOwnProperty(name)) {
-        return this.callFrame.symbols[name].node;
+      if (this.callFrame.symbols.has(name)) {
+        return this.callFrame.symbols.get(name).node;
       }
-      if (this.builtins.hasOwnProperty(name)) {
+      if (this.builtins.has(name)) {
         const native = this.newNode(NodeTypeEnum.Native);
         native.nativeNode = {
           name,
-          function: this.builtins[name],
+          function: this.builtins.get(name),
           builtin: true,
         };
         return native;
@@ -2702,7 +2702,7 @@ export class VM {
         if (this.callFrame.coroutine) {
           this.callFrame.coroutine.funcNode.coroutineIndex =
             this.callFrame.index - 2;
-          Object.entries(this.callFrame.variableMap).forEach(([key, index]) => {
+          this.callFrame.variableMap.forEach((index) => {
             const symbol = this.callFrame.symbolsArray[index];
             this.callFrame.coroutine.funcNode.symbolsArray[index] = symbol;
           });

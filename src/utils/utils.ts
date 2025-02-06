@@ -120,27 +120,27 @@ export const injectCommonAndModules = (
 
     commonVM.evaluate();
 
-    Object.keys(commonVM.callFrame.variableMap).forEach((k) => {
-      const index = commonVM.callFrame.variableMap[k];
+    commonVM.callFrame.variableMap.forEach((_, k) => {
+      const index = commonVM.callFrame.variableMap.get(k);
       const symbol = commonVM.callFrame.symbolsArray[index];
       symbol.isGlobal = true;
-      vm.callFrame.symbols[k] = symbol;
+      vm.callFrame.symbols.set(k, symbol);
     });
 
     const moduleObject = commonParser.newNode(NodeTypeEnum.Object, {});
     moduleObject.evaluated = true;
-    Object.keys(commonVM.callFrame.symbols).forEach((key) => {
-      moduleObject.value[key] = commonVM.callFrame.symbols[key].node;
+    commonVM.callFrame.symbols.forEach((_, key) => {
+      moduleObject.value[key] = commonVM.callFrame.symbols.get(key).node;
     });
-    Object.keys(commonVM.callFrame.variableMap).forEach((key) => {
-      const index = commonVM.callFrame.variableMap[key];
+    commonVM.callFrame.variableMap.forEach((_, key) => {
+      const index = commonVM.callFrame.variableMap.get(key);
       moduleObject.value[key] = commonVM.callFrame.symbolsArray[index].node;
     });
-    vm.callFrame.symbols.__common = {
+    vm.callFrame.symbols.set("__common", {
       node: moduleObject,
       const: false,
       isGlobal: true,
-    };
+    });
   } catch (e) {
     console.warn(
       "Warning: File not found: 'common.sp' - common functions have not been imported"
@@ -186,7 +186,7 @@ export const injectCommonAndModules = (
       );
       const moduleGeneratorResult = moduleGenerator.generate();
 
-      if (moduleParserResult == -1) {
+      if (moduleGeneratorResult == -1) {
         return;
       }
 
@@ -199,10 +199,10 @@ export const injectCommonAndModules = (
       moduleVM.callFrame.variables = moduleGenerator.variables;
       moduleVM.callFrame.tempVariables = moduleGenerator.tempVariables;
 
-      Object.keys(vm.callFrame.symbols).forEach((key) => {
-        const symbol = vm.callFrame.symbols[key];
+      vm.callFrame.symbols.forEach((_, key) => {
+        const symbol = vm.callFrame.symbols.get(key);
         if (symbol.isGlobal) {
-          moduleVM.callFrame.symbols[key] = symbol;
+          moduleVM.callFrame.symbols.set(key, symbol);
         }
       });
 
@@ -214,22 +214,23 @@ export const injectCommonAndModules = (
 
       const moduleObject = moduleParser.newNode(NodeTypeEnum.Object, {});
       moduleObject.evaluated = true;
-      Object.keys(moduleVM.callFrame.variableMap).forEach((key) => {
-        const index = moduleVM.callFrame.variableMap[key];
+      moduleVM.callFrame.variableMap.forEach((_, key) => {
+        const index = moduleVM.callFrame.variableMap.get(key);
         const symbol = moduleVM.callFrame.symbolsArray[index];
         moduleObject.value[key] = {
           ...symbol.node,
           meta: { hiddenProp: symbol.isGlobal },
         };
       });
-      vm.callFrame.symbols[moduleNameMap[moduleName]] = {
+      vm.callFrame.symbols.set(moduleNameMap[moduleName], {
         node: moduleObject,
         const: false,
         isGlobal: true,
-      };
+      });
 
-      vm.callFrame.symbols.__common.node.value[moduleNameMap[moduleName]] =
-        vm.callFrame.symbols[moduleNameMap[moduleName]].node;
+      vm.callFrame.symbols.get("__common").node.value[
+        moduleNameMap[moduleName]
+      ] = vm.callFrame.symbols.get(moduleNameMap[moduleName]).node;
     });
   } catch (e) {
     console.warn("Warning: Encountered an error while loading builtin modules");
@@ -278,20 +279,28 @@ export const injectConfig = (vm: VM, cwd: string) => {
     configVM.evaluate();
 
     const globals =
-      configVM.callFrame.symbolsArray[configVM.callFrame.variableMap.globals];
+      configVM.callFrame.symbolsArray[
+        configVM.callFrame.variableMap.get("globals")
+      ];
     const operators =
-      configVM.callFrame.symbolsArray[configVM.callFrame.variableMap.operators];
+      configVM.callFrame.symbolsArray[
+        configVM.callFrame.variableMap.get("operators")
+      ];
     const paths =
-      configVM.callFrame.symbolsArray[configVM.callFrame.variableMap.paths];
+      configVM.callFrame.symbolsArray[
+        configVM.callFrame.variableMap.get("paths")
+      ];
     const node =
-      configVM.callFrame.symbolsArray[configVM.callFrame.variableMap.node];
+      configVM.callFrame.symbolsArray[
+        configVM.callFrame.variableMap.get("node")
+      ];
 
     for (const key of Object.keys(globals?.node?.value ?? {})) {
-      vm.callFrame.symbols[key] = {
+      vm.callFrame.symbols.set(key, {
         node: globals.node.value[key],
         const: true,
         isGlobal: true,
-      };
+      });
     }
 
     for (const key of Object.keys(operators?.node?.value ?? {})) {
@@ -312,18 +321,16 @@ export const injectConfig = (vm: VM, cwd: string) => {
 
     moduleObject.evaluated = true;
 
-    Object.entries(configVM.callFrame.variableMap ?? {}).forEach(
-      ([name, index]) => {
-        const symbol = configVM.callFrame.symbolsArray[index];
-        moduleObject.value[name] = symbol.node;
-      }
-    );
+    configVM.callFrame.variableMap.forEach((index, name) => {
+      const symbol = configVM.callFrame.symbolsArray[index];
+      moduleObject.value[name] = symbol.node;
+    });
 
-    vm.callFrame.symbols.__config = {
+    vm.callFrame.symbols.set("__config", {
       node: moduleObject,
       const: false,
       isGlobal: true,
-    };
+    });
 
     const modulePaths = require("module").globalPaths;
 

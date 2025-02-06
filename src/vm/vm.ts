@@ -2653,6 +2653,13 @@ export class VM {
     },
   };
 
+  nodeMap = new Map(
+    Object.entries(this.nodeFunctions).map(([key, value]) => [
+      Number(key),
+      value,
+    ])
+  );
+
   public evaluate() {
     global._vm = this;
     while (true) {
@@ -2675,7 +2682,11 @@ export class VM {
         }
       }
 
-      const res = this.nodeFunctions[this.callFrame.instruction.type](
+      // const res = this.nodeFunctions[this.callFrame.instruction.type](
+      //   this.callFrame.instruction
+      // );
+
+      const res = this.nodeMap.get(this.callFrame.instruction.type)(
         this.callFrame.instruction
       );
 

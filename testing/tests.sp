@@ -12,7 +12,7 @@
 //     getLocalTests
 // } = Test
 
-assert :: ((compFunction::Function, a, b) => Undefined)
+assert :: ((compFunction :: Function, a, b) => Undefined)
 objectHas :: ((object :: Object, prop :: String) => Boolean)
 isEqual :: ((a, b) => Boolean)
 
@@ -26,9 +26,10 @@ const test_object = () => {
             a: 10 + 4,
             b: 20,
             c :: [Number | String]: (1...4),
-            d: (const d = 1200) + (const e = 1.4)
+            d: (const d = 1200) + (const e = 1.4),
+            e: 0
         },
-        [key]: PI
+        [key]: PI,
     }
 
     person.nums[0] = 100
@@ -41,8 +42,6 @@ const test_object = () => {
     assert(isEqual, person.bloop.e, 2401.4)
     assert(isEqual, person.bloop.e, 2401.4)
 }
-
-const g :: String = test_object()
 
 // const test_coroutines = () => {
 //     const coro = () => {

@@ -1410,12 +1410,9 @@ export class TypeChecker {
           const type = this.resolveValueType(node.left);
           const valueType = this.resolveValueType(node.right);
 
-          // TODO: Either allow or disallow changes to objects
-          // Currently it's allowed, but no type info is retained, so not great
-
-          if (type.type === NodeTypeEnum.Undefined) {
-            return valueType;
-          }
+          // if (type.type === NodeTypeEnum.Undefined) {
+          //   return valueType;
+          // }
 
           if (!this.checkTypes(type, valueType)) {
             this.errorAndExit(

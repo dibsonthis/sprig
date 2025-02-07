@@ -12,8 +12,6 @@ const {
     getLocalTests
 } = Test
 
-println(Test)
-
 const test_object = () => {
     const PI = 3.14
     const key = "id"
@@ -558,6 +556,51 @@ const test_currying = () => {
     const add = curried((a, b) => a + b)
     
     assert(isEqual, add(10)(20), 30)
+}
+
+const test_strategy = () => {
+    const (Commuter) = () => ({
+        goToWork: () => {},
+        setStrategy: (strategy) => (this.goToWork = strategy)
+    })
+    
+    const walkingStrategy = () => "Walking to work"
+    const drivingStrategy = () => "Driving to work"
+    
+    const c = Commuter()
+    c.setStrategy(drivingStrategy)
+    const res = c.goToWork()
+
+    assert(isEqual, res, "Driving to work")
+}
+
+const test_observer = () => {
+    const (EventManager) = () => ({
+        subscribers: {},
+        subscribe: (eventType, callback) => {
+            if (!this.subscribers[eventType]) {
+                this.subscribers[eventType] = []
+            }
+            this.subscribers[eventType]->append(callback)
+            return this
+        },
+        broadcast: (eventType, data) => {
+            for (this.subscribers[eventType], cb) {
+                cb(data)
+            }
+            return this
+        }
+    })
+    
+    const m = {}
+    const cb1 = (data) => {
+        m["x"] = data
+    }
+    
+    const manager = EventManager()
+    manager.subscribe("on", cb1).broadcast("on", 100)
+    
+    assert(isEqual, m.x, 100)
 }
 
 const tests = getLocalTests()
